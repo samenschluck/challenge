@@ -48,7 +48,7 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
         setStage('scanning');
         await scannerRef.current.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 130 } },
+          { fps: 10, qrbox: { width: 280, height: 150 } },
           (text: string) => {
             if (!doneRef.current && !cancelled) {
               doneRef.current = true;
@@ -114,7 +114,7 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
         setStage('scanning');
         await scannerRef.current.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 130 } },
+          { fps: 10, qrbox: { width: 280, height: 150 } },
           (text: string) => {
             if (!doneRef.current) {
               doneRef.current = true;
@@ -152,6 +152,7 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
           id: 'bcs-div',
           style: {
             width: '100%',
+            minHeight: stage === 'scanning' ? 300 : 0,
             display: stage === 'scanning' ? 'block' : 'none',
             borderRadius: 12,
             overflow: 'hidden',
@@ -266,11 +267,11 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   card: {
-    width: '92%',
-    maxHeight: '85%' as any,
+    width: '96%',
+    maxHeight: '92%' as any,
     backgroundColor: COLORS.card,
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
