@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView,
-  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform, ActivityIndicator,
+  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { saveDayEntry } from '../services/firestoreService';
-import { lookupBarcode, FoodProduct } from '../services/openFoodFacts';
 import { getTodayString, formatDate } from '../utils/dateUtils';
 import { DayEntry, WorkoutEntry, NutritionEntry, Meal } from '../types';
 import BarcodeScanner from '../components/BarcodeScanner';
@@ -82,10 +81,6 @@ export default function CheckinScreen({ onDone }: Props) {
 
   // Barcode scanner
   const [showScanner, setShowScanner] = useState(false);
-  const [productLoading, setProductLoading] = useState(false);
-  const [scannedProduct, setScannedProduct] = useState<FoodProduct | null>(null);
-  const [scanError, setScanError] = useState<string | null>(null);
-  const [portionGrams, setPortionGrams] = useState('100');
 
   // Mood & notes
   const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>((todayMyEntry?.mood as any) ?? 3);
@@ -127,44 +122,11 @@ export default function CheckinScreen({ onDone }: Props) {
     else { setCalories(''); setProtein(''); setCarbs(''); setFat(''); }
   }
 
-  async function onBarcodeDetected(barcode: string) {
-    setShowScanner(false);
-    setProductLoading(true);
-    setScanError(null);
-    setScannedProduct(null);
-    try {
-      const product = await lookupBarcode(barcode);
-      if (product) {
-        setScannedProduct(product);
-        setPortionGrams('100');
-      } else {
-        setScanError(`Produkt nicht gefunden (Barcode: ${barcode})`);
-      }
-    } catch {
-      setScanError('Netzwerkfehler – Produkt konnte nicht geladen werden');
-    } finally {
-      setProductLoading(false);
-    }
-  }
-
-  function addScannedProduct() {
-    if (!scannedProduct) return;
-    const g = Math.max(1, Number(portionGrams) || 100);
-    const f = g / 100;
-    const meal: Meal = {
-      id: Date.now().toString(),
-      name: `${scannedProduct.name} (${g}g)`,
-      calories: Math.round(scannedProduct.kcalPer100g * f),
-      protein: +(scannedProduct.proteinPer100g * f).toFixed(1),
-      carbs: +(scannedProduct.carbsPer100g * f).toFixed(1),
-      fat: +(scannedProduct.fatPer100g * f).toFixed(1),
-      time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-    };
+  function addScannedMeal(meal: Meal) {
     const updated = [...meals, meal];
     setMeals(updated);
     recalcTotals(updated);
-    setScannedProduct(null);
-    setScanError(null);
+    setShowScanner(false);
   }
 
   async function save() {
@@ -223,10 +185,6 @@ export default function CheckinScreen({ onDone }: Props) {
       setSaving(false);
     }
   }
-
-  // Portion calculator
-  const portionG = Math.max(1, Number(portionGrams) || 100);
-  const portionF = portionG / 100;
 
   return (
     <LinearGradient colors={['#0f0f1a', '#0f0f1a']} style={{ flex: 1 }}>
@@ -306,57 +264,9 @@ export default function CheckinScreen({ onDone }: Props) {
               <SectionHeader icon="🥗" title="Mahlzeiten & Nährwerte" />
 
               {/* Barcode Scanner Button */}
-              <TouchableOpacity style={styles.scanBtn} onPress={() => { setScanError(null); setShowScanner(true); }}>
+              <TouchableOpacity style={styles.scanBtn} onPress={() => setShowScanner(true)}>
                 <Text style={styles.scanBtnText}>📷  Barcode scannen</Text>
               </TouchableOpacity>
-
-              {/* Product loading */}
-              {productLoading && (
-                <View style={styles.productLoading}>
-                  <ActivityIndicator color={COLORS.primary} size="small" />
-                  <Text style={styles.productLoadingText}>Produkt wird geladen…</Text>
-                </View>
-              )}
-
-              {/* Scan error */}
-              {scanError && (
-                <View style={styles.scanErrorBox}>
-                  <Text style={styles.scanErrorText}>⚠️ {scanError}</Text>
-                </View>
-              )}
-
-              {/* Scanned product card */}
-              {scannedProduct && (
-                <View style={styles.productCard}>
-                  <Text style={styles.productName}>{scannedProduct.name}</Text>
-                  <Text style={styles.productPer100}>
-                    pro 100g: {scannedProduct.kcalPer100g} kcal · P {scannedProduct.proteinPer100g}g · K {scannedProduct.carbsPer100g}g · F {scannedProduct.fatPer100g}g
-                  </Text>
-                  <View style={styles.portionRow}>
-                    <Text style={styles.portionLabel}>Portion:</Text>
-                    <TextInput
-                      style={styles.portionInput}
-                      value={portionGrams}
-                      onChangeText={setPortionGrams}
-                      keyboardType="numeric"
-                      placeholder="100"
-                      placeholderTextColor={COLORS.textMuted}
-                    />
-                    <Text style={styles.portionUnit}>g</Text>
-                  </View>
-                  <Text style={styles.portionCalc}>
-                    = {Math.round(scannedProduct.kcalPer100g * portionF)} kcal · P {(scannedProduct.proteinPer100g * portionF).toFixed(1)}g · K {(scannedProduct.carbsPer100g * portionF).toFixed(1)}g · F {(scannedProduct.fatPer100g * portionF).toFixed(1)}g
-                  </Text>
-                  <View style={styles.productBtns}>
-                    <TouchableOpacity style={styles.addProductBtn} onPress={addScannedProduct}>
-                      <Text style={styles.addProductBtnText}>+ Zur Mahlzeitenliste</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.discardBtn} onPress={() => setScannedProduct(null)}>
-                      <Text style={styles.discardBtnText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
 
               {/* Meals list */}
               {meals.length > 0 && (
@@ -469,7 +379,7 @@ export default function CheckinScreen({ onDone }: Props) {
         {/* Barcode Scanner Overlay */}
         {showScanner && (
           <BarcodeScanner
-            onDetected={onBarcodeDetected}
+            onMealAdded={addScannedMeal}
             onClose={() => setShowScanner(false)}
           />
         )}
@@ -507,33 +417,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.primary + '88', marginBottom: 14,
   },
   scanBtnText: { color: COLORS.primaryLight, fontWeight: '700', fontSize: 15 },
-  productLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  productLoadingText: { color: COLORS.textSecondary, fontSize: 13 },
-  scanErrorBox: {
-    backgroundColor: COLORS.danger + '22', borderRadius: 10, padding: 12,
-    marginBottom: 12, borderWidth: 1, borderColor: COLORS.danger + '55',
-  },
-  scanErrorText: { color: COLORS.danger, fontSize: 13 },
-  productCard: {
-    backgroundColor: COLORS.primary + '15', borderRadius: 14, padding: 14,
-    marginBottom: 14, borderWidth: 1, borderColor: COLORS.primary + '55',
-  },
-  productName: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
-  productPer100: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 },
-  portionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
-  portionLabel: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' },
-  portionInput: {
-    backgroundColor: COLORS.cardLight, borderRadius: 8, padding: 8,
-    color: COLORS.text, fontSize: 18, fontWeight: '800',
-    width: 80, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center' as any,
-  },
-  portionUnit: { fontSize: 14, color: COLORS.textSecondary },
-  portionCalc: { fontSize: 13, color: COLORS.primaryLight, fontWeight: '700', marginBottom: 12 },
-  productBtns: { flexDirection: 'row', gap: 8 },
-  addProductBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: 10, padding: 12, alignItems: 'center' },
-  addProductBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  discardBtn: { backgroundColor: COLORS.border, borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center' },
-  discardBtnText: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
 
   // Meals
   mealsList: { marginBottom: 4 },
