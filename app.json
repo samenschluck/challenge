@@ -23,7 +23,12 @@
       "package": "com.fitnesschallenge.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "static",
+      "baseUrl": "/challenge",
+      "name": "100 Tage Challenge",
+      "themeColor": "#6C63FF",
+      "backgroundColor": "#0f0f1a"
     },
     "plugins": []
   }
