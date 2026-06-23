@@ -8,7 +8,7 @@ const firebaseConfig = {
   storageBucket: 'challenge-84fde.firebasestorage.app',
   messagingSenderId: '1025477610006',
   appId: '1:1025477610006:web:0e165454404bd154cc4337',
-  databaseURL: 'https://challenge-84fde-default-rtdb.firebaseio.com',
+  databaseURL: 'https://challenge-84fde-default-rtdb.europe-west1.firebasedatabase.app',
 };
 
 export const firebaseProjectId = firebaseConfig.projectId;
