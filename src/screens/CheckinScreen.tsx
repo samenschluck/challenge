@@ -7,7 +7,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { saveDayEntry } from '../services/firestoreService';
-import { firebaseConfigured } from '../config/firebase';
 import { getTodayString, formatDate } from '../utils/dateUtils';
 import { DayEntry, WorkoutEntry, NutritionEntry, Meal } from '../types';
 import BarcodeScanner from '../components/BarcodeScanner';
@@ -139,26 +138,6 @@ export default function CheckinScreen({ onDone }: Props) {
     }
     if (!hasWorkout && !calories && !protein && !carbs && !fat && !water && meals.length === 0) {
       setSaveError('Bitte mindestens Sport aktivieren oder Nährwerte eintragen.');
-      return;
-    }
-
-    // Diagnostic: check which Firestore databases exist
-    try {
-      const r = await fetch(
-        'https://firestore.googleapis.com/v1/projects/challenge-84fde/databases?key=AIzaSyBDPV7ppVjZQ6blpsWZ5EOfROw5U9FFL30'
-      );
-      const json = await r.json();
-      if (!r.ok) {
-        setSaveError(`Firebase API Fehler: ${json?.error?.message ?? r.status}`);
-        return;
-      }
-      const dbs = (json.databases ?? []).map((d: any) => d.name).join(', ');
-      if (!dbs) {
-        setSaveError('Keine Firestore-Datenbank gefunden. Bitte in Firebase Console → Firestore eine Datenbank erstellen.');
-        return;
-      }
-    } catch (e: any) {
-      setSaveError(`Netzwerkfehler beim Firebase-Check: ${e?.message}`);
       return;
     }
 
@@ -398,9 +377,6 @@ export default function CheckinScreen({ onDone }: Props) {
               </LinearGradient>
             </TouchableOpacity>
 
-            <Text style={styles.debugInfo}>
-              User: {currentUser ? currentUser.name : '❌ KEIN USER'} | Mahlzeiten: {meals.length} | Kcal: {calories || '0'}
-            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
 
@@ -502,5 +478,4 @@ const styles = StyleSheet.create({
     marginBottom: 12, borderWidth: 1, borderColor: '#ff4444',
   },
   errorText: { color: '#ff6666', fontSize: 13, lineHeight: 20 },
-  debugInfo: { color: '#555', fontSize: 10, textAlign: 'center', marginTop: 8 },
 });
