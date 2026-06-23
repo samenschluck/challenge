@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView,
-  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform,
+  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { saveDayEntry } from '../services/firestoreService';
+import { lookupBarcode, FoodProduct } from '../services/openFoodFacts';
 import { getTodayString, formatDate } from '../utils/dateUtils';
 import { DayEntry, WorkoutEntry, NutritionEntry, Meal } from '../types';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 const WORKOUT_TYPES = ['Krafttraining', 'Cardio', 'HIIT', 'Laufen', 'Radfahren', 'Schwimmen', 'Fußball', 'Basketball', 'Yoga', 'Sonstiges'];
 const INTENSITIES = [
@@ -56,31 +58,52 @@ export default function CheckinScreen({ onDone }: Props) {
   const { currentUser, todayMyEntry } = useApp();
   const today = getTodayString();
 
+  // Sport
   const [hasWorkout, setHasWorkout] = useState(!!todayMyEntry?.workout);
   const [workoutType, setWorkoutType] = useState(todayMyEntry?.workout?.type ?? 'Krafttraining');
   const [workoutDuration, setWorkoutDuration] = useState(String(todayMyEntry?.workout?.duration ?? '60'));
   const [intensity, setIntensity] = useState<'leicht' | 'mittel' | 'intensiv'>(todayMyEntry?.workout?.intensity ?? 'mittel');
   const [workoutNotes, setWorkoutNotes] = useState(todayMyEntry?.workout?.notes ?? '');
 
+  // Nutrition totals
   const [calories, setCalories] = useState(String(todayMyEntry?.nutrition?.calories ?? ''));
   const [protein, setProtein] = useState(String(todayMyEntry?.nutrition?.protein ?? ''));
   const [carbs, setCarbs] = useState(String(todayMyEntry?.nutrition?.carbs ?? ''));
   const [fat, setFat] = useState(String(todayMyEntry?.nutrition?.fat ?? ''));
   const [water, setWater] = useState(String(todayMyEntry?.nutrition?.water ?? ''));
   const [meals, setMeals] = useState<Meal[]>(todayMyEntry?.nutrition?.meals ?? []);
+
+  // Manual meal form
   const [mealName, setMealName] = useState('');
   const [mealCal, setMealCal] = useState('');
   const [mealProtein, setMealProtein] = useState('');
   const [mealCarbs, setMealCarbs] = useState('');
   const [mealFat, setMealFat] = useState('');
 
+  // Barcode scanner
+  const [showScanner, setShowScanner] = useState(false);
+  const [productLoading, setProductLoading] = useState(false);
+  const [scannedProduct, setScannedProduct] = useState<FoodProduct | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [portionGrams, setPortionGrams] = useState('100');
+
+  // Mood & notes
   const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>((todayMyEntry?.mood as any) ?? 3);
   const [notes, setNotes] = useState(todayMyEntry?.notes ?? '');
+
+  // Save state
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done'>('idle');
 
-  function addMeal() {
+  function recalcTotals(list: Meal[]) {
+    setCalories(String(list.reduce((s, m) => s + m.calories, 0)));
+    setProtein(String(+(list.reduce((s, m) => s + m.protein, 0)).toFixed(1)));
+    setCarbs(String(+(list.reduce((s, m) => s + m.carbs, 0)).toFixed(1)));
+    setFat(String(+(list.reduce((s, m) => s + m.fat, 0)).toFixed(1)));
+  }
+
+  function addManualMeal() {
     if (!mealName.trim()) return;
     const meal: Meal = {
       id: Date.now().toString(),
@@ -93,27 +116,55 @@ export default function CheckinScreen({ onDone }: Props) {
     };
     const updated = [...meals, meal];
     setMeals(updated);
-    // Auto-sum macros
-    const totCal = updated.reduce((s, m) => s + m.calories, 0);
-    const totP = updated.reduce((s, m) => s + m.protein, 0);
-    const totC = updated.reduce((s, m) => s + m.carbs, 0);
-    const totF = updated.reduce((s, m) => s + m.fat, 0);
-    setCalories(String(totCal));
-    setProtein(String(totP));
-    setCarbs(String(totC));
-    setFat(String(totF));
+    recalcTotals(updated);
     setMealName(''); setMealCal(''); setMealProtein(''); setMealCarbs(''); setMealFat('');
   }
 
   function removeMeal(id: string) {
     const updated = meals.filter(m => m.id !== id);
     setMeals(updated);
-    if (updated.length > 0) {
-      setCalories(String(updated.reduce((s, m) => s + m.calories, 0)));
-      setProtein(String(updated.reduce((s, m) => s + m.protein, 0)));
-      setCarbs(String(updated.reduce((s, m) => s + m.carbs, 0)));
-      setFat(String(updated.reduce((s, m) => s + m.fat, 0)));
+    if (updated.length > 0) recalcTotals(updated);
+    else { setCalories(''); setProtein(''); setCarbs(''); setFat(''); }
+  }
+
+  async function onBarcodeDetected(barcode: string) {
+    setShowScanner(false);
+    setProductLoading(true);
+    setScanError(null);
+    setScannedProduct(null);
+    try {
+      const product = await lookupBarcode(barcode);
+      if (product) {
+        setScannedProduct(product);
+        setPortionGrams('100');
+      } else {
+        setScanError(`Produkt nicht gefunden (Barcode: ${barcode})`);
+      }
+    } catch {
+      setScanError('Netzwerkfehler – Produkt konnte nicht geladen werden');
+    } finally {
+      setProductLoading(false);
     }
+  }
+
+  function addScannedProduct() {
+    if (!scannedProduct) return;
+    const g = Math.max(1, Number(portionGrams) || 100);
+    const f = g / 100;
+    const meal: Meal = {
+      id: Date.now().toString(),
+      name: `${scannedProduct.name} (${g}g)`,
+      calories: Math.round(scannedProduct.kcalPer100g * f),
+      protein: +(scannedProduct.proteinPer100g * f).toFixed(1),
+      carbs: +(scannedProduct.carbsPer100g * f).toFixed(1),
+      fat: +(scannedProduct.fatPer100g * f).toFixed(1),
+      time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+    };
+    const updated = [...meals, meal];
+    setMeals(updated);
+    recalcTotals(updated);
+    setScannedProduct(null);
+    setScanError(null);
   }
 
   async function save() {
@@ -122,7 +173,7 @@ export default function CheckinScreen({ onDone }: Props) {
       setSaveError('Kein User eingeloggt – bitte neu einloggen.');
       return;
     }
-    if (!hasWorkout && !calories && !protein && !carbs && !fat && !water) {
+    if (!hasWorkout && !calories && !protein && !carbs && !fat && !water && meals.length === 0) {
       setSaveError('Bitte mindestens Sport aktivieren oder Nährwerte eintragen.');
       return;
     }
@@ -158,18 +209,24 @@ export default function CheckinScreen({ onDone }: Props) {
       };
 
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout – Firebase nicht erreichbar. Prüfe deine Firestore-Regeln: Firebase Console → Firestore → Regeln → allow read, write: if true')), 8000)
+        setTimeout(() => reject(new Error(
+          'Timeout – Firebase nicht erreichbar.\n\nFirebase Console → Firestore → Regeln → allow read, write: if true'
+        )), 8000)
       );
       await Promise.race([saveDayEntry(entry), timeout]);
       setSaveStatus('done');
-      setTimeout(() => onDone(), 500);
+      setTimeout(() => onDone(), 600);
     } catch (e: any) {
-      setSaveError((e?.message ?? 'Unbekannter Fehler') + '\n\nFirebase Console → Firestore → Regeln → allow read, write: if true');
+      setSaveError(e?.message ?? 'Unbekannter Fehler');
       setSaveStatus('idle');
     } finally {
       setSaving(false);
     }
   }
+
+  // Portion calculator
+  const portionG = Math.max(1, Number(portionGrams) || 100);
+  const portionF = portionG / 100;
 
   return (
     <LinearGradient colors={['#0f0f1a', '#0f0f1a']} style={{ flex: 1 }}>
@@ -246,15 +303,90 @@ export default function CheckinScreen({ onDone }: Props) {
 
             {/* ── NÄHRWERTE ── */}
             <View style={styles.card}>
-              <SectionHeader icon="🥗" title="Nährwerte" />
+              <SectionHeader icon="🥗" title="Mahlzeiten & Nährwerte" />
 
-              {/* Mahlzeiten erfassen */}
-              <Text style={styles.fieldLabel}>Mahlzeit hinzufügen</Text>
+              {/* Barcode Scanner Button */}
+              <TouchableOpacity style={styles.scanBtn} onPress={() => { setScanError(null); setShowScanner(true); }}>
+                <Text style={styles.scanBtnText}>📷  Barcode scannen</Text>
+              </TouchableOpacity>
+
+              {/* Product loading */}
+              {productLoading && (
+                <View style={styles.productLoading}>
+                  <ActivityIndicator color={COLORS.primary} size="small" />
+                  <Text style={styles.productLoadingText}>Produkt wird geladen…</Text>
+                </View>
+              )}
+
+              {/* Scan error */}
+              {scanError && (
+                <View style={styles.scanErrorBox}>
+                  <Text style={styles.scanErrorText}>⚠️ {scanError}</Text>
+                </View>
+              )}
+
+              {/* Scanned product card */}
+              {scannedProduct && (
+                <View style={styles.productCard}>
+                  <Text style={styles.productName}>{scannedProduct.name}</Text>
+                  <Text style={styles.productPer100}>
+                    pro 100g: {scannedProduct.kcalPer100g} kcal · P {scannedProduct.proteinPer100g}g · K {scannedProduct.carbsPer100g}g · F {scannedProduct.fatPer100g}g
+                  </Text>
+                  <View style={styles.portionRow}>
+                    <Text style={styles.portionLabel}>Portion:</Text>
+                    <TextInput
+                      style={styles.portionInput}
+                      value={portionGrams}
+                      onChangeText={setPortionGrams}
+                      keyboardType="numeric"
+                      placeholder="100"
+                      placeholderTextColor={COLORS.textMuted}
+                    />
+                    <Text style={styles.portionUnit}>g</Text>
+                  </View>
+                  <Text style={styles.portionCalc}>
+                    = {Math.round(scannedProduct.kcalPer100g * portionF)} kcal · P {(scannedProduct.proteinPer100g * portionF).toFixed(1)}g · K {(scannedProduct.carbsPer100g * portionF).toFixed(1)}g · F {(scannedProduct.fatPer100g * portionF).toFixed(1)}g
+                  </Text>
+                  <View style={styles.productBtns}>
+                    <TouchableOpacity style={styles.addProductBtn} onPress={addScannedProduct}>
+                      <Text style={styles.addProductBtnText}>+ Zur Mahlzeitenliste</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.discardBtn} onPress={() => setScannedProduct(null)}>
+                      <Text style={styles.discardBtnText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Meals list */}
+              {meals.length > 0 && (
+                <View style={styles.mealsList}>
+                  <Text style={styles.fieldLabel}>Heutige Mahlzeiten ({meals.length})</Text>
+                  {meals.map((m, i) => (
+                    <View key={m.id} style={styles.mealChip}>
+                      <View style={styles.mealChipNum}>
+                        <Text style={styles.mealChipNumText}>{i + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.mealChipName}>{m.name} <Text style={styles.mealChipTime}>{m.time}</Text></Text>
+                        <Text style={styles.mealChipMacros}>{m.calories} kcal · P:{m.protein}g · K:{m.carbs}g · F:{m.fat}g</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => removeMeal(m.id)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                        <Text style={styles.mealRemove}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Manual meal form */}
+              <View style={styles.divider} />
+              <Text style={styles.fieldLabel}>Manuell hinzufügen</Text>
               <TextInput
                 style={[styles.singleInput, { marginBottom: 8 }]}
                 value={mealName}
                 onChangeText={setMealName}
-                placeholder="Name (z.B. Frühstück, Hähnchen...)"
+                placeholder="Name (z.B. Frühstück, Hähnchen…)"
                 placeholderTextColor={COLORS.textMuted}
               />
               <View style={styles.mealMacroRow}>
@@ -262,23 +394,12 @@ export default function CheckinScreen({ onDone }: Props) {
                 <TextInput style={styles.mealInput} value={mealProtein} onChangeText={setMealProtein} placeholder="P(g)" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
                 <TextInput style={styles.mealInput} value={mealCarbs} onChangeText={setMealCarbs} placeholder="K(g)" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
                 <TextInput style={styles.mealInput} value={mealFat} onChangeText={setMealFat} placeholder="F(g)" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
-                <TouchableOpacity style={styles.addMealBtn} onPress={addMeal}>
+                <TouchableOpacity style={styles.addMealBtn} onPress={addManualMeal}>
                   <Text style={styles.addMealText}>+</Text>
                 </TouchableOpacity>
               </View>
 
-              {meals.map(m => (
-                <View key={m.id} style={styles.mealChip}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.mealChipName}>{m.name} <Text style={styles.mealChipTime}>({m.time})</Text></Text>
-                    <Text style={styles.mealChipMacros}>{m.calories} kcal · P:{m.protein}g · K:{m.carbs}g · F:{m.fat}g</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => removeMeal(m.id)}>
-                    <Text style={styles.mealRemove}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-
+              {/* Daily totals (auto-summed or manual) */}
               <View style={styles.divider} />
               <Text style={styles.fieldLabel}>Tages-Summe</Text>
               <NumberInput label="Kalorien" value={calories} unit="kcal" onChange={setCalories} color={COLORS.calories} />
@@ -302,7 +423,6 @@ export default function CheckinScreen({ onDone }: Props) {
                   </TouchableOpacity>
                 ))}
               </View>
-
               <Text style={styles.fieldLabel}>Notizen (optional)</Text>
               <TextInput
                 style={[styles.singleInput, { minHeight: 60 }]}
@@ -340,13 +460,19 @@ export default function CheckinScreen({ onDone }: Props) {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Debug: User info */}
             <Text style={styles.debugInfo}>
-              User: {currentUser ? currentUser.name : '❌ KEIN USER'} | Workout: {hasWorkout ? 'ja' : 'nein'}{'\n'}
-              Kcal: "{calories}" | P: "{protein}" | K: "{carbs}" | F: "{fat}" | Mahlzeiten: {meals.length}
+              User: {currentUser ? currentUser.name : '❌ KEIN USER'} | Mahlzeiten: {meals.length} | Kcal: {calories || '0'}
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {/* Barcode Scanner Overlay */}
+        {showScanner && (
+          <BarcodeScanner
+            onDetected={onBarcodeDetected}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -373,32 +499,92 @@ const styles = StyleSheet.create({
   intensityRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   intensityBtn: { flex: 1, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
   intensityText: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
-  mealMacroRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
-  mealInput: {
-    flex: 1, backgroundColor: COLORS.cardLight, borderRadius: 8, padding: 9,
-    color: COLORS.text, fontSize: 13, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center',
+
+  // Barcode
+  scanBtn: {
+    backgroundColor: COLORS.primary + '22',
+    borderRadius: 12, padding: 14, alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.primary + '88', marginBottom: 14,
   },
-  addMealBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
-  addMealText: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  mealChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.cardLight, borderRadius: 10, padding: 10, marginBottom: 6, borderWidth: 1, borderColor: COLORS.border },
+  scanBtnText: { color: COLORS.primaryLight, fontWeight: '700', fontSize: 15 },
+  productLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  productLoadingText: { color: COLORS.textSecondary, fontSize: 13 },
+  scanErrorBox: {
+    backgroundColor: COLORS.danger + '22', borderRadius: 10, padding: 12,
+    marginBottom: 12, borderWidth: 1, borderColor: COLORS.danger + '55',
+  },
+  scanErrorText: { color: COLORS.danger, fontSize: 13 },
+  productCard: {
+    backgroundColor: COLORS.primary + '15', borderRadius: 14, padding: 14,
+    marginBottom: 14, borderWidth: 1, borderColor: COLORS.primary + '55',
+  },
+  productName: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
+  productPer100: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 12 },
+  portionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
+  portionLabel: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' },
+  portionInput: {
+    backgroundColor: COLORS.cardLight, borderRadius: 8, padding: 8,
+    color: COLORS.text, fontSize: 18, fontWeight: '800',
+    width: 80, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center' as any,
+  },
+  portionUnit: { fontSize: 14, color: COLORS.textSecondary },
+  portionCalc: { fontSize: 13, color: COLORS.primaryLight, fontWeight: '700', marginBottom: 12 },
+  productBtns: { flexDirection: 'row', gap: 8 },
+  addProductBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: 10, padding: 12, alignItems: 'center' },
+  addProductBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  discardBtn: { backgroundColor: COLORS.border, borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center' },
+  discardBtnText: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
+
+  // Meals
+  mealsList: { marginBottom: 4 },
+  mealChip: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: COLORS.cardLight, borderRadius: 12, padding: 10,
+    marginBottom: 8, borderWidth: 1, borderColor: COLORS.border, gap: 10,
+  },
+  mealChipNum: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: COLORS.primary + '33', alignItems: 'center', justifyContent: 'center',
+  },
+  mealChipNumText: { fontSize: 11, fontWeight: '800', color: COLORS.primaryLight },
   mealChipName: { fontSize: 13, fontWeight: '700', color: COLORS.text },
   mealChipTime: { fontSize: 11, color: COLORS.textMuted, fontWeight: '400' },
   mealChipMacros: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
   mealRemove: { color: COLORS.danger, fontSize: 16, padding: 4 },
+  mealMacroRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  mealInput: {
+    flex: 1, backgroundColor: COLORS.cardLight, borderRadius: 8, padding: 9,
+    color: COLORS.text, fontSize: 13, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center' as any,
+  },
+  addMealBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
+  addMealText: { color: '#fff', fontSize: 20, fontWeight: '700' },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
+
+  // Totals
   numberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   numberLabel: { width: 110, fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
-  numberInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.cardLight, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 12, paddingVertical: 8 },
+  numberInputWrap: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: COLORS.cardLight, borderRadius: 10, borderWidth: 1,
+    borderColor: COLORS.border, paddingHorizontal: 12, paddingVertical: 8,
+  },
   numberInput: { flex: 1, color: COLORS.text, fontSize: 16, fontWeight: '700' },
   numberUnit: { color: COLORS.textSecondary, fontSize: 13 },
+
+  // Mood
   moodRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
   moodBtn: { padding: 10, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
   moodBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '22' },
   moodEmoji: { fontSize: 32 },
+
+  // Save
   saveBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 8 },
   saveBtnGrad: { padding: 18, alignItems: 'center' },
   saveBtnText: { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  errorBox: { backgroundColor: '#ff000033', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#ff4444' },
+  errorBox: {
+    backgroundColor: '#ff000033', borderRadius: 12, padding: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: '#ff4444',
+  },
   errorText: { color: '#ff6666', fontSize: 13, lineHeight: 20 },
   debugInfo: { color: '#555', fontSize: 10, textAlign: 'center', marginTop: 8 },
 });
