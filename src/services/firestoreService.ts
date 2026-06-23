@@ -49,13 +49,11 @@ export function subscribeAllEntriesForDate(date: string, cb: (entries: DayEntry[
 }
 
 export function subscribeUserEntries(userId: string, cb: (entries: DayEntry[]) => void) {
-  const q = query(
-    collection(db, 'entries'),
-    where('userId', '==', userId),
-    orderBy('date', 'desc')
-  );
+  const q = query(collection(db, 'entries'), where('userId', '==', userId));
   return onSnapshot(q, snap => {
-    cb(snap.docs.map(d => d.data() as DayEntry));
+    const entries = snap.docs.map(d => d.data() as DayEntry);
+    entries.sort((a, b) => b.date.localeCompare(a.date));
+    cb(entries);
   });
 }
 

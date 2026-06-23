@@ -116,7 +116,7 @@ export default function CheckinScreen({ onDone }: Props) {
 
   async function save() {
     if (!currentUser) return;
-    if (!hasWorkout && !calories) {
+    if (!hasWorkout && !calories && !protein && !carbs && !fat && !water) {
       Alert.alert('Hinweis', 'Bitte mindestens Sport oder Nährwerte eintragen.');
       return;
     }
@@ -129,7 +129,7 @@ export default function CheckinScreen({ onDone }: Props) {
         notes: workoutNotes || undefined,
       } : null;
 
-      const hasNutrition = !!(calories || protein || carbs || fat);
+      const hasNutrition = !!(calories || protein || carbs || fat || water);
       const nutrition: NutritionEntry | null = hasNutrition ? {
         calories: Number(calories) || 0,
         protein: Number(protein) || 0,
@@ -149,13 +149,18 @@ export default function CheckinScreen({ onDone }: Props) {
         notes: notes || undefined,
         completedAt: new Date().toISOString(),
       };
-      // Sofort navigieren, Firebase im Hintergrund
+
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout – Keine Verbindung zu Firebase')), 8000)
+      );
+      await Promise.race([saveDayEntry(entry), timeout]);
       onDone();
-      saveDayEntry(entry).catch(() => {
-        Alert.alert('Sync-Fehler', 'Eintrag gespeichert, aber Sync fehlgeschlagen. Wird automatisch wiederholt.');
-      });
-    } catch (e) {
-      Alert.alert('Fehler', 'Etwas ist schiefgelaufen.');
+    } catch (e: any) {
+      const msg = e?.message ?? 'Unbekannter Fehler';
+      Alert.alert(
+        'Speichern fehlgeschlagen',
+        msg + '\n\nBitte prüfe deine Firestore-Regeln in der Firebase Console (Firestore → Regeln → allow read, write: if true)',
+      );
     } finally {
       setSaving(false);
     }
