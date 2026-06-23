@@ -35,6 +35,12 @@ jobs:
           EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
 
+      - name: Fix asset paths for GitHub Pages subdirectory
+        run: |
+          sed -i 's|src="/_expo/|src="/challenge/_expo/|g' dist/index.html
+          sed -i 's|href="/_expo/|href="/challenge/_expo/|g' dist/index.html
+          sed -i 's|href="/favicon.ico"|href="/challenge/favicon.ico"|g' dist/index.html
+
       - name: Add .nojekyll (required for GitHub Pages)
         run: touch dist/.nojekyll
 
