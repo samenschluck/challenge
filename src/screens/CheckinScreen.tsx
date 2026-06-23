@@ -177,9 +177,7 @@ export default function CheckinScreen({ onDone }: Props) {
       };
 
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(
-          'Timeout – Firebase nicht erreichbar.\n\nFirebase Console → Firestore → Regeln → allow read, write: if true'
-        )), 8000)
+        setTimeout(() => reject(new Error('Verbindungs-Timeout (15s). Prüfe deine Internetverbindung.')), 15000)
       );
       await Promise.race([saveDayEntry(entry), timeout]);
       setSaveStatus('done');

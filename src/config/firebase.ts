@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBDPV7ppVjZQ6blpsWZ5EOfROw5U9FFL30',
@@ -14,4 +14,10 @@ export const firebaseProjectId = firebaseConfig.projectId;
 export const firebaseConfigured = true;
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-export const db = getFirestore(app);
+
+// Use HTTP long-polling (no WebSockets) + memory-only cache so writes
+// fail immediately with a real error instead of hanging indefinitely
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: memoryLocalCache(),
+});
