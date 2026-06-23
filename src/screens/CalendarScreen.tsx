@@ -14,8 +14,8 @@ function getDayStatus(entries: DayEntry[], userId: string, date: string): 'full'
   if (date < CHALLENGE_START || date > CHALLENGE_END) return 'future';
   const entry = entries.find(e => e.userId === userId && e.date === date);
   if (!entry) return 'none';
-  if (entry.workout && entry.nutrition) return 'full';
-  if (entry.workout || entry.nutrition) return 'partial';
+  if (entry.workout) return 'full';
+  if (entry.nutrition) return 'partial';
   return 'none';
 }
 
