@@ -43,12 +43,25 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
       try {
         await loadScript(CDN_URL);
         if (cancelled) return;
-        const Html5Qrcode = (window as any).Html5Qrcode;
-        scannerRef.current = new Html5Qrcode('bcs-div');
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = window as any;
+        // Enable EAN-13/8 and UPC formats used on food packaging
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+        ];
+        scannerRef.current = new Html5Qrcode('bcs-div', {
+          formatsToSupport,
+          useBarCodeDetectorIfSupported: true, // native Android Chrome detection
+          verbose: false,
+        });
         setStage('scanning');
         await scannerRef.current.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 280, height: 150 } },
+          { fps: 15, qrbox: { width: 280, height: 150 } },
           (text: string) => {
             if (!doneRef.current && !cancelled) {
               doneRef.current = true;
@@ -109,12 +122,24 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
     // Restart scanner
     setTimeout(async () => {
       try {
-        const Html5Qrcode = (window as any).Html5Qrcode;
-        scannerRef.current = new Html5Qrcode('bcs-div');
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = window as any;
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+        ];
+        scannerRef.current = new Html5Qrcode('bcs-div', {
+          formatsToSupport,
+          useBarCodeDetectorIfSupported: true,
+          verbose: false,
+        });
         setStage('scanning');
         await scannerRef.current.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 280, height: 150 } },
+          { fps: 15, qrbox: { width: 280, height: 150 } },
           (text: string) => {
             if (!doneRef.current) {
               doneRef.current = true;
