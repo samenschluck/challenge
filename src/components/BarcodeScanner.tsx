@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput,
+  View, Text, TouchableOpacity, StyleSheet, TextInput,
 } from 'react-native';
 import { COLORS } from '../constants/theme';
 
@@ -11,45 +11,80 @@ interface Props {
 
 export default function BarcodeScanner({ onDetected, onClose }: Props) {
   const videoRef = useRef<any>(null);
-  const [status, setStatus] = useState<'starting' | 'ready' | 'error'>('starting');
+  const streamRef = useRef<any>(null);
+  const rafRef = useRef<any>(null);
+  const [status, setStatus] = useState<'starting' | 'scanning' | 'unsupported' | 'error'>('starting');
   const [errorMsg, setErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
-  const stopRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    function stopAll() {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach((t: any) => t.stop());
+    }
+
+    async function start() {
+      if (!('BarcodeDetector' in window)) {
+        setStatus('unsupported');
+        return;
+      }
       try {
-        const mod = await import('@zxing/browser');
-        if (cancelled || !videoRef.current) return;
-        const reader = new mod.BrowserMultiFormatReader();
-        setStatus('ready');
-        const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: 'environment' } },
-          videoRef.current,
-          (result, _err, ctrl) => {
-            if (result && !cancelled) {
+        const stream = await (navigator.mediaDevices as any).getUserMedia({
+          video: { facingMode: 'environment' },
+        });
+        if (cancelled) { stream.getTracks().forEach((t: any) => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+
+        const detector = new (window as any).BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
+        });
+        setStatus('scanning');
+
+        const scan = async () => {
+          if (cancelled || !videoRef.current) return;
+          try {
+            const found = await detector.detect(videoRef.current);
+            if (found.length > 0 && !cancelled) {
               cancelled = true;
-              ctrl.stop();
-              onDetected(result.getText());
+              stopAll();
+              onDetected(found[0].rawValue);
+              return;
             }
-          }
-        );
-        stopRef.current = () => controls.stop();
+          } catch { /* frame not ready yet */ }
+          rafRef.current = requestAnimationFrame(scan);
+        };
+        rafRef.current = requestAnimationFrame(scan);
       } catch (e: any) {
         if (!cancelled) {
           setStatus('error');
           setErrorMsg(e?.message ?? 'Kamera nicht verfügbar');
         }
       }
-    })();
+    }
 
-    return () => {
-      cancelled = true;
-      stopRef.current?.();
-    };
+    start();
+    return () => { cancelled = true; stopAll(); };
   }, []);
+
+  const videoEl = React.createElement('video', {
+    ref: videoRef,
+    muted: true,
+    playsInline: true,
+    style: {
+      width: '100%',
+      maxHeight: 260,
+      borderRadius: 12,
+      objectFit: 'cover',
+      backgroundColor: '#000',
+      display: status === 'scanning' || status === 'starting' ? 'block' : 'none',
+    },
+  });
 
   return (
     <View style={styles.overlay}>
@@ -61,35 +96,17 @@ export default function BarcodeScanner({ onDetected, onClose }: Props) {
           </TouchableOpacity>
         </View>
 
-        {status === 'starting' && (
-          <View style={styles.center}>
-            <ActivityIndicator color={COLORS.primary} size="large" />
-            <Text style={styles.hint}>Kamera wird gestartet…</Text>
-          </View>
-        )}
+        {videoEl}
 
-        {React.createElement('video', {
-          ref: videoRef,
-          autoPlay: true,
-          muted: true,
-          playsInline: true,
-          style: {
-            width: '100%',
-            maxHeight: 260,
-            borderRadius: 12,
-            objectFit: 'cover',
-            backgroundColor: '#000',
-            display: status === 'error' ? 'none' : 'block',
-          },
-        })}
-
-        {status === 'ready' && (
-          <Text style={styles.hint}>Halte den Barcode in die Kamera – wird automatisch erkannt</Text>
-        )}
-
-        {status === 'error' && (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+        {status === 'starting' && <Text style={styles.hint}>Kamera wird gestartet…</Text>}
+        {status === 'scanning' && <Text style={styles.hint}>Barcode in die Kamera halten – wird automatisch erkannt</Text>}
+        {(status === 'unsupported' || status === 'error') && (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              {status === 'unsupported'
+                ? '📱 Kamera-Scan wird auf diesem Browser nicht unterstützt.\nBitte Barcode-Nummer unten eingeben.'
+                : `⚠️ ${errorMsg}`}
+            </Text>
           </View>
         )}
 
@@ -142,9 +159,9 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   closeText: { fontSize: 24, color: COLORS.textSecondary, fontWeight: '700' },
-  center: { alignItems: 'center', paddingVertical: 24 },
   hint: { color: COLORS.textSecondary, textAlign: 'center', marginTop: 10, fontSize: 13, lineHeight: 18 },
-  errorText: { color: COLORS.danger, textAlign: 'center', fontSize: 14 },
+  infoBox: { backgroundColor: COLORS.cardLight, borderRadius: 10, padding: 14, marginTop: 8 },
+  infoText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 20, textAlign: 'center' },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
   manualLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 8 },
   manualRow: { flexDirection: 'row', gap: 8 },

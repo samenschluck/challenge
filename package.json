@@ -28,9 +28,7 @@
     "react-native-calendars": "^1.1305.0",
     "@expo/vector-icons": "^14.0.2",
     "react-native-modal": "^13.0.1",
-    "react-native-progress": "^5.0.1",
-    "@zxing/browser": "^0.1.4",
-    "@zxing/library": "^0.21.3"
+    "react-native-progress": "^5.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
