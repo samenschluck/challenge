@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, TextInput,
+  View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../constants/theme';
 
@@ -9,82 +9,69 @@ interface Props {
   onClose: () => void;
 }
 
+const CDN_URL = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).Html5Qrcode) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Scan-Bibliothek konnte nicht geladen werden (kein Internet?)'));
+    document.head.appendChild(s);
+  });
+}
+
 export default function BarcodeScanner({ onDetected, onClose }: Props) {
-  const videoRef = useRef<any>(null);
-  const streamRef = useRef<any>(null);
-  const rafRef = useRef<any>(null);
-  const [status, setStatus] = useState<'starting' | 'scanning' | 'unsupported' | 'error'>('starting');
+  const [status, setStatus] = useState<'loading' | 'scanning' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
+  const scannerRef = useRef<any>(null);
+  const doneRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    function stopAll() {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      streamRef.current?.getTracks().forEach((t: any) => t.stop());
-    }
-
     async function start() {
-      if (!('BarcodeDetector' in window)) {
-        setStatus('unsupported');
-        return;
-      }
       try {
-        const stream = await (navigator.mediaDevices as any).getUserMedia({
-          video: { facingMode: 'environment' },
-        });
-        if (cancelled) { stream.getTracks().forEach((t: any) => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
+        await loadScript(CDN_URL);
+        if (cancelled) return;
 
-        const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
-        });
+        const Html5Qrcode = (window as any).Html5Qrcode;
+        scannerRef.current = new Html5Qrcode('barcode-scanner-div');
         setStatus('scanning');
 
-        const scan = async () => {
-          if (cancelled || !videoRef.current) return;
-          try {
-            const found = await detector.detect(videoRef.current);
-            if (found.length > 0 && !cancelled) {
-              cancelled = true;
-              stopAll();
-              onDetected(found[0].rawValue);
-              return;
+        await scannerRef.current.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 130 } },
+          (text: string) => {
+            if (!doneRef.current && !cancelled) {
+              doneRef.current = true;
+              stopScanner();
+              onDetected(text);
             }
-          } catch { /* frame not ready yet */ }
-          rafRef.current = requestAnimationFrame(scan);
-        };
-        rafRef.current = requestAnimationFrame(scan);
+          },
+          () => { /* ignore per-frame errors */ }
+        );
       } catch (e: any) {
         if (!cancelled) {
           setStatus('error');
-          setErrorMsg(e?.message ?? 'Kamera nicht verfügbar');
+          setErrorMsg(e?.message ?? 'Kamera konnte nicht gestartet werden');
         }
       }
     }
 
-    start();
-    return () => { cancelled = true; stopAll(); };
-  }, []);
+    function stopScanner() {
+      scannerRef.current?.stop().catch(() => {});
+    }
 
-  const videoEl = React.createElement('video', {
-    ref: videoRef,
-    muted: true,
-    playsInline: true,
-    style: {
-      width: '100%',
-      maxHeight: 260,
-      borderRadius: 12,
-      objectFit: 'cover',
-      backgroundColor: '#000',
-      display: status === 'scanning' || status === 'starting' ? 'block' : 'none',
-    },
-  });
+    start();
+
+    return () => {
+      cancelled = true;
+      stopScanner();
+    };
+  }, []);
 
   return (
     <View style={styles.overlay}>
@@ -96,17 +83,32 @@ export default function BarcodeScanner({ onDetected, onClose }: Props) {
           </TouchableOpacity>
         </View>
 
-        {videoEl}
+        {status === 'loading' && (
+          <View style={styles.center}>
+            <ActivityIndicator color={COLORS.primary} size="large" />
+            <Text style={styles.hint}>Wird geladen…</Text>
+          </View>
+        )}
 
-        {status === 'starting' && <Text style={styles.hint}>Kamera wird gestartet…</Text>}
-        {status === 'scanning' && <Text style={styles.hint}>Barcode in die Kamera halten – wird automatisch erkannt</Text>}
-        {(status === 'unsupported' || status === 'error') && (
+        {/* Scanner container – html5-qrcode renders camera preview here */}
+        {React.createElement('div', {
+          id: 'barcode-scanner-div',
+          style: {
+            width: '100%',
+            display: status === 'scanning' ? 'block' : 'none',
+            borderRadius: 12,
+            overflow: 'hidden',
+          },
+        })}
+
+        {status === 'scanning' && (
+          <Text style={styles.hint}>EAN-Barcode in die Kamera halten – wird automatisch erkannt</Text>
+        )}
+
+        {status === 'error' && (
           <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              {status === 'unsupported'
-                ? '📱 Kamera-Scan wird auf diesem Browser nicht unterstützt.\nBitte Barcode-Nummer unten eingeben.'
-                : `⚠️ ${errorMsg}`}
-            </Text>
+            <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+            <Text style={styles.hint}>Bitte Barcode-Nummer unten manuell eingeben.</Text>
           </View>
         )}
 
@@ -159,9 +161,10 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   closeText: { fontSize: 24, color: COLORS.textSecondary, fontWeight: '700' },
+  center: { alignItems: 'center', paddingVertical: 24 },
   hint: { color: COLORS.textSecondary, textAlign: 'center', marginTop: 10, fontSize: 13, lineHeight: 18 },
-  infoBox: { backgroundColor: COLORS.cardLight, borderRadius: 10, padding: 14, marginTop: 8 },
-  infoText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  infoBox: { alignItems: 'center', paddingVertical: 12 },
+  errorText: { color: COLORS.danger, fontSize: 13, textAlign: 'center', marginBottom: 6 },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
   manualLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 8 },
   manualRow: { flexDirection: 'row', gap: 8 },
