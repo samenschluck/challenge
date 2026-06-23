@@ -43,11 +43,16 @@ export default function UserDayCard({ user, entry, isMe }: Props) {
             </View>
           </View>
         </View>
-        {entry && (
-          <View style={styles.moodBubble}>
-            <Text style={styles.moodText}>{['😴', '😐', '🙂', '😊', '🔥'][((entry.mood || 3) - 1)]}</Text>
-          </View>
-        )}
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          {entry && (
+            <View style={styles.moodBubble}>
+              <Text style={styles.moodText}>{['😴', '😐', '🙂', '😊', '🔥'][((entry.mood || 3) - 1)]}</Text>
+            </View>
+          )}
+          {entry?.weight ? (
+            <Text style={styles.weightText}>⚖️ {entry.weight} kg</Text>
+          ) : null}
+        </View>
       </View>
 
       {hasWorkout && (
@@ -109,5 +114,6 @@ const styles = StyleSheet.create({
   barFill: { height: 6, borderRadius: 3 },
   macroValue: { width: 40, fontSize: 12, color: COLORS.text, textAlign: 'right' },
   water: { marginTop: 6, fontSize: 12, color: COLORS.protein },
+  weightText: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600' },
   emptyText: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', padding: 8 },
 });

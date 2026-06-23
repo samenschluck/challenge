@@ -11,6 +11,7 @@ interface AppContextType {
   myEntries: DayEntry[];
   todayMyEntry: DayEntry | null;
   setCurrentUser: (user: User) => Promise<void>;
+  updateUserSettings: (updates: { height?: number; gender?: 'male' | 'female'; age?: number }) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -51,10 +52,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const todayMyEntry = todayEntries.find(e => e.userId === currentUser?.id) ?? null;
 
   async function setCurrentUser(user: User) {
-    // Sofort lokal speichern und UI aktualisieren – Firebase im Hintergrund
     await saveUser(user);
     setCurrentUserState(user);
-    upsertUser(user).catch(() => {}); // fire-and-forget
+    upsertUser(user).catch(() => {});
+  }
+
+  async function updateUserSettings(updates: { height?: number; gender?: 'male' | 'female'; age?: number }) {
+    if (!currentUser) return;
+    const updated: User = { ...currentUser, ...updates };
+    await saveUser(updated);
+    setCurrentUserState(updated);
+    upsertUser(updated).catch(() => {});
   }
 
   function logout() {
@@ -63,7 +71,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ currentUser, allUsers, todayEntries, myEntries, todayMyEntry, setCurrentUser, logout, loading }}>
+    <AppContext.Provider value={{
+      currentUser, allUsers, todayEntries, myEntries, todayMyEntry,
+      setCurrentUser, updateUserSettings, logout, loading,
+    }}>
       {children}
     </AppContext.Provider>
   );

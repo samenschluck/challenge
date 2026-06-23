@@ -9,7 +9,7 @@ import { useApp } from '../context/AppContext';
 import { saveDayEntry } from '../services/firestoreService';
 import { getTodayString, formatDate } from '../utils/dateUtils';
 import { DayEntry, WorkoutEntry, NutritionEntry, Meal } from '../types';
-import BarcodeScanner from '../components/BarcodeScanner';
+import AddMealModal from '../components/AddMealModal';
 
 const WORKOUT_TYPES = ['Krafttraining', 'Cardio', 'HIIT', 'Laufen', 'Radfahren', 'Schwimmen', 'Fußball', 'Basketball', 'Yoga', 'Sonstiges'];
 const INTENSITIES = [
@@ -32,27 +32,6 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
   );
 }
 
-function NumberInput({ label, value, unit, onChange, color }: {
-  label: string; value: string; unit: string; onChange: (v: string) => void; color?: string;
-}) {
-  return (
-    <View style={styles.numberRow}>
-      <Text style={[styles.numberLabel, color ? { color } : {}]}>{label}</Text>
-      <View style={styles.numberInputWrap}>
-        <TextInput
-          style={styles.numberInput}
-          value={value}
-          onChangeText={onChange}
-          keyboardType="numeric"
-          placeholder="0"
-          placeholderTextColor={COLORS.textMuted}
-        />
-        <Text style={styles.numberUnit}>{unit}</Text>
-      </View>
-    </View>
-  );
-}
-
 export default function CheckinScreen({ onDone }: Props) {
   const { currentUser, todayMyEntry } = useApp();
   const today = getTodayString();
@@ -64,23 +43,16 @@ export default function CheckinScreen({ onDone }: Props) {
   const [intensity, setIntensity] = useState<'leicht' | 'mittel' | 'intensiv'>(todayMyEntry?.workout?.intensity ?? 'mittel');
   const [workoutNotes, setWorkoutNotes] = useState(todayMyEntry?.workout?.notes ?? '');
 
-  // Nutrition totals
-  const [calories, setCalories] = useState(String(todayMyEntry?.nutrition?.calories ?? ''));
-  const [protein, setProtein] = useState(String(todayMyEntry?.nutrition?.protein ?? ''));
-  const [carbs, setCarbs] = useState(String(todayMyEntry?.nutrition?.carbs ?? ''));
-  const [fat, setFat] = useState(String(todayMyEntry?.nutrition?.fat ?? ''));
-  const [water, setWater] = useState(String(todayMyEntry?.nutrition?.water ?? ''));
+  // Meals & water
   const [meals, setMeals] = useState<Meal[]>(todayMyEntry?.nutrition?.meals ?? []);
+  const [water, setWater] = useState(todayMyEntry?.nutrition?.water ? String(todayMyEntry.nutrition.water) : '');
 
-  // Manual meal form
-  const [mealName, setMealName] = useState('');
-  const [mealCal, setMealCal] = useState('');
-  const [mealProtein, setMealProtein] = useState('');
-  const [mealCarbs, setMealCarbs] = useState('');
-  const [mealFat, setMealFat] = useState('');
+  // Weight
+  const [weight, setWeight] = useState(todayMyEntry?.weight ? String(todayMyEntry.weight) : '');
 
-  // Barcode scanner
-  const [showScanner, setShowScanner] = useState(false);
+  // Meal modal state
+  const [showAddMeal, setShowAddMeal] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
 
   // Mood & notes
   const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>((todayMyEntry?.mood as any) ?? 3);
@@ -91,43 +63,33 @@ export default function CheckinScreen({ onDone }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done'>('idle');
 
-  function recalcTotals(list: Meal[]) {
-    setCalories(String(list.reduce((s, m) => s + m.calories, 0)));
-    setProtein(String(+(list.reduce((s, m) => s + m.protein, 0)).toFixed(1)));
-    setCarbs(String(+(list.reduce((s, m) => s + m.carbs, 0)).toFixed(1)));
-    setFat(String(+(list.reduce((s, m) => s + m.fat, 0)).toFixed(1)));
-  }
+  // Inline totals
+  const totalCal = meals.reduce((s, m) => s + m.calories, 0);
+  const totalProtein = +meals.reduce((s, m) => s + m.protein, 0).toFixed(1);
+  const totalCarbs = +meals.reduce((s, m) => s + m.carbs, 0).toFixed(1);
+  const totalFat = +meals.reduce((s, m) => s + m.fat, 0).toFixed(1);
 
-  function addManualMeal() {
-    if (!mealName.trim()) return;
-    const meal: Meal = {
-      id: Date.now().toString(),
-      name: mealName.trim(),
-      calories: Number(mealCal) || 0,
-      protein: Number(mealProtein) || 0,
-      carbs: Number(mealCarbs) || 0,
-      fat: Number(mealFat) || 0,
-      time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
-    };
-    const updated = [...meals, meal];
-    setMeals(updated);
-    recalcTotals(updated);
-    setMealName(''); setMealCal(''); setMealProtein(''); setMealCarbs(''); setMealFat('');
+  function handleMealAdded(meal: Meal) {
+    if (editingMeal) {
+      setMeals(prev => prev.map(m => m.id === editingMeal.id ? meal : m));
+    } else {
+      setMeals(prev => [...prev, meal]);
+    }
+    setEditingMeal(null);
   }
 
   function removeMeal(id: string) {
-    const updated = meals.filter(m => m.id !== id);
-    setMeals(updated);
-    if (updated.length > 0) recalcTotals(updated);
-    else { setCalories(''); setProtein(''); setCarbs(''); setFat(''); }
+    setMeals(prev => prev.filter(m => m.id !== id));
   }
 
-  function addScannedMeal(meal: Meal) {
-    const updated = [...meals, meal];
-    setMeals(updated);
-    recalcTotals(updated);
-    // Do not close here — BarcodeScanner stays open briefly (success stage)
-    // to absorb ghost/phantom taps before calling onClose itself
+  function openEdit(meal: Meal) {
+    setEditingMeal(meal);
+    setShowAddMeal(true);
+  }
+
+  function openAdd() {
+    setEditingMeal(null);
+    setShowAddMeal(true);
   }
 
   async function save() {
@@ -136,8 +98,8 @@ export default function CheckinScreen({ onDone }: Props) {
       setSaveError('Kein User eingeloggt – bitte neu einloggen.');
       return;
     }
-    if (!hasWorkout && !calories && !protein && !carbs && !fat && !water && meals.length === 0) {
-      setSaveError('Bitte mindestens Sport aktivieren oder Nährwerte eintragen.');
+    if (!hasWorkout && meals.length === 0 && !water && !weight) {
+      setSaveError('Bitte mindestens Sport aktivieren, eine Mahlzeit hinzufügen oder Gewicht eintragen.');
       return;
     }
 
@@ -151,12 +113,12 @@ export default function CheckinScreen({ onDone }: Props) {
         ...(workoutNotes ? { notes: workoutNotes } : {}),
       } : null;
 
-      const hasNutrition = !!(calories || protein || carbs || fat || water || meals.length > 0);
+      const hasNutrition = meals.length > 0 || !!water;
       const nutrition: NutritionEntry | null = hasNutrition ? {
-        calories: Number(calories) || 0,
-        protein: Number(protein) || 0,
-        carbs: Number(carbs) || 0,
-        fat: Number(fat) || 0,
+        calories: totalCal,
+        protein: totalProtein,
+        carbs: totalCarbs,
+        fat: totalFat,
         water: Number(water) || 0,
         meals,
       } : null;
@@ -168,14 +130,12 @@ export default function CheckinScreen({ onDone }: Props) {
         workout,
         nutrition,
         mood,
+        weight: weight ? Number(weight) : undefined,
         ...(notes ? { notes } : {}),
         completedAt: new Date().toISOString(),
       };
 
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Verbindungs-Timeout (15s). Prüfe deine Internetverbindung.')), 15000)
-      );
-      await Promise.race([saveDayEntry(entry), timeout]);
+      await saveDayEntry(entry);
       setSaveStatus('done');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (e: any) {
@@ -193,6 +153,22 @@ export default function CheckinScreen({ onDone }: Props) {
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
             <Text style={styles.title}>Tages-Check-in</Text>
             <Text style={styles.subtitle}>{formatDate(today)}</Text>
+
+            {/* ── GEWICHT ── */}
+            <View style={styles.card}>
+              <SectionHeader icon="⚖️" title="Heutiges Gewicht" />
+              <View style={styles.weightRow}>
+                <TextInput
+                  style={styles.weightInput}
+                  value={weight}
+                  onChangeText={setWeight}
+                  keyboardType="numeric"
+                  placeholder="80.5"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+                <Text style={styles.weightUnit}>kg</Text>
+              </View>
+            </View>
 
             {/* ── SPORT ── */}
             <View style={styles.card}>
@@ -259,64 +235,68 @@ export default function CheckinScreen({ onDone }: Props) {
               )}
             </View>
 
-            {/* ── NÄHRWERTE ── */}
+            {/* ── MAHLZEITEN ── */}
             <View style={styles.card}>
-              <SectionHeader icon="🥗" title="Mahlzeiten & Nährwerte" />
-
-              {/* Barcode Scanner Button */}
-              <TouchableOpacity style={styles.scanBtn} onPress={() => setShowScanner(true)}>
-                <Text style={styles.scanBtnText}>📷  Barcode scannen</Text>
-              </TouchableOpacity>
+              <SectionHeader icon="🥗" title="Mahlzeiten" />
 
               {/* Meals list */}
               {meals.length > 0 && (
                 <View style={styles.mealsList}>
-                  <Text style={styles.fieldLabel}>Heutige Mahlzeiten ({meals.length})</Text>
                   {meals.map((m, i) => (
-                    <View key={m.id} style={styles.mealChip}>
+                    <TouchableOpacity key={m.id} style={styles.mealChip} onPress={() => openEdit(m)} activeOpacity={0.7}>
                       <View style={styles.mealChipNum}>
                         <Text style={styles.mealChipNumText}>{i + 1}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.mealChipName}>{m.name} <Text style={styles.mealChipTime}>{m.time}</Text></Text>
-                        <Text style={styles.mealChipMacros}>{m.calories} kcal · P:{m.protein}g · K:{m.carbs}g · F:{m.fat}g</Text>
+                        <Text style={styles.mealChipName}>
+                          {m.name} <Text style={styles.mealChipTime}>{m.time}</Text>
+                        </Text>
+                        <Text style={styles.mealChipMacros}>
+                          {m.calories} kcal · P:{m.protein}g · K:{m.carbs}g · F:{m.fat}g
+                        </Text>
                       </View>
-                      <TouchableOpacity onPress={() => removeMeal(m.id)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                      <View style={styles.mealEditHint}>
+                        <Text style={styles.mealEditIcon}>✏️</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => removeMeal(m.id)}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                      >
                         <Text style={styles.mealRemove}>✕</Text>
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   ))}
+
+                  {/* Totals row */}
+                  <View style={styles.totalsRow}>
+                    <Text style={styles.totalsLabel}>Gesamt</Text>
+                    <Text style={styles.totalsKcal}>{totalCal} kcal</Text>
+                    <Text style={styles.totalsMacros}>
+                      P:{totalProtein}g · K:{totalCarbs}g · F:{totalFat}g
+                    </Text>
+                  </View>
                 </View>
               )}
 
-              {/* Manual meal form */}
-              <View style={styles.divider} />
-              <Text style={styles.fieldLabel}>Manuell hinzufügen</Text>
-              <TextInput
-                style={[styles.singleInput, { marginBottom: 8 }]}
-                value={mealName}
-                onChangeText={setMealName}
-                placeholder="Name (z.B. Frühstück, Hähnchen…)"
-                placeholderTextColor={COLORS.textMuted}
-              />
-              <View style={styles.mealMacroRow}>
-                <TextInput style={styles.mealInput} value={mealCal} onChangeText={setMealCal} placeholder="kcal" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
-                <TextInput style={styles.mealInput} value={mealProtein} onChangeText={setMealProtein} placeholder="P(g)" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
-                <TextInput style={styles.mealInput} value={mealCarbs} onChangeText={setMealCarbs} placeholder="K(g)" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
-                <TextInput style={styles.mealInput} value={mealFat} onChangeText={setMealFat} placeholder="F(g)" placeholderTextColor={COLORS.textMuted} keyboardType="numeric" />
-                <TouchableOpacity style={styles.addMealBtn} onPress={addManualMeal}>
-                  <Text style={styles.addMealText}>+</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Add meal button */}
+              <TouchableOpacity style={styles.addMealBtn} onPress={openAdd}>
+                <Text style={styles.addMealBtnText}>+ Mahlzeit hinzufügen</Text>
+              </TouchableOpacity>
 
-              {/* Daily totals (auto-summed or manual) */}
+              {/* Water */}
               <View style={styles.divider} />
-              <Text style={styles.fieldLabel}>Tages-Summe</Text>
-              <NumberInput label="Kalorien" value={calories} unit="kcal" onChange={setCalories} color={COLORS.calories} />
-              <NumberInput label="Protein" value={protein} unit="g" onChange={setProtein} color={COLORS.protein} />
-              <NumberInput label="Kohlenhydrate" value={carbs} unit="g" onChange={setCarbs} color={COLORS.carbs} />
-              <NumberInput label="Fett" value={fat} unit="g" onChange={setFat} color={COLORS.fat} />
-              <NumberInput label="Wasser" value={water} unit="ml" onChange={setWater} />
+              <Text style={styles.fieldLabel}>Wasser</Text>
+              <View style={styles.waterRow}>
+                <TextInput
+                  style={styles.waterInput}
+                  value={water}
+                  onChangeText={setWater}
+                  keyboardType="numeric"
+                  placeholder="2000"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+                <Text style={styles.waterUnit}>ml</Text>
+              </View>
             </View>
 
             {/* ── STIMMUNG ── */}
@@ -376,15 +356,14 @@ export default function CheckinScreen({ onDone }: Props) {
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
-
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Barcode Scanner Overlay */}
-        {showScanner && (
-          <BarcodeScanner
-            onMealAdded={addScannedMeal}
-            onClose={() => setShowScanner(false)}
+        {showAddMeal && (
+          <AddMealModal
+            editMeal={editingMeal ?? undefined}
+            onMealAdded={handleMealAdded}
+            onClose={() => { setShowAddMeal(false); setEditingMeal(null); }}
           />
         )}
       </SafeAreaView>
@@ -402,6 +381,23 @@ const styles = StyleSheet.create({
   sectionIcon: { fontSize: 22, marginRight: 10 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   fieldLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
+
+  // Weight
+  weightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardLight,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  weightInput: { flex: 1, color: COLORS.text, fontSize: 26, fontWeight: '800' },
+  weightUnit: { color: COLORS.textSecondary, fontSize: 16 },
+
+  // Workout
   pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardLight },
   pillActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '33' },
   pillText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
@@ -414,16 +410,8 @@ const styles = StyleSheet.create({
   intensityBtn: { flex: 1, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
   intensityText: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
 
-  // Barcode
-  scanBtn: {
-    backgroundColor: COLORS.primary + '22',
-    borderRadius: 12, padding: 14, alignItems: 'center',
-    borderWidth: 1, borderColor: COLORS.primary + '88', marginBottom: 14,
-  },
-  scanBtnText: { color: COLORS.primaryLight, fontWeight: '700', fontSize: 15 },
-
   // Meals
-  mealsList: { marginBottom: 4 },
+  mealsList: { marginBottom: 10 },
   mealChip: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: COLORS.cardLight, borderRadius: 12, padding: 10,
@@ -437,26 +425,42 @@ const styles = StyleSheet.create({
   mealChipName: { fontSize: 13, fontWeight: '700', color: COLORS.text },
   mealChipTime: { fontSize: 11, color: COLORS.textMuted, fontWeight: '400' },
   mealChipMacros: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  mealEditHint: { paddingHorizontal: 4 },
+  mealEditIcon: { fontSize: 14 },
   mealRemove: { color: COLORS.danger, fontSize: 16, padding: 4 },
-  mealMacroRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
-  mealInput: {
-    flex: 1, backgroundColor: COLORS.cardLight, borderRadius: 8, padding: 9,
-    color: COLORS.text, fontSize: 13, borderWidth: 1, borderColor: COLORS.border, textAlign: 'center' as any,
+  totalsRow: {
+    backgroundColor: COLORS.primary + '18',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '44',
   },
-  addMealBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
-  addMealText: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
+  totalsLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 4 },
+  totalsKcal: { fontSize: 20, fontWeight: '800', color: COLORS.primaryLight, marginBottom: 2 },
+  totalsMacros: { fontSize: 12, color: COLORS.textSecondary },
+  addMealBtn: {
+    backgroundColor: COLORS.primary + '22',
+    borderRadius: 12, padding: 14, alignItems: 'center',
+    borderWidth: 1, borderColor: COLORS.primary + '88',
+  },
+  addMealBtnText: { color: COLORS.primaryLight, fontWeight: '700', fontSize: 15 },
 
-  // Totals
-  numberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  numberLabel: { width: 110, fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
-  numberInputWrap: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.cardLight, borderRadius: 10, borderWidth: 1,
-    borderColor: COLORS.border, paddingHorizontal: 12, paddingVertical: 8,
+  // Water
+  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
+  waterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardLight,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
   },
-  numberInput: { flex: 1, color: COLORS.text, fontSize: 16, fontWeight: '700' },
-  numberUnit: { color: COLORS.textSecondary, fontSize: 13 },
+  waterInput: { flex: 1, color: COLORS.text, fontSize: 18, fontWeight: '700' },
+  waterUnit: { color: COLORS.textSecondary, fontSize: 14 },
 
   // Mood
   moodRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },

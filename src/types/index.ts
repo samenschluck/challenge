@@ -3,6 +3,9 @@ export interface User {
   name: string;
   avatar: string;
   avatarColor: string;
+  height?: number;
+  gender?: 'male' | 'female';
+  age?: number;
 }
 
 export interface WorkoutEntry {
@@ -39,6 +42,7 @@ export interface DayEntry {
   nutrition: NutritionEntry | null;
   mood: 1 | 2 | 3 | 4 | 5;
   notes?: string;
+  weight?: number;
   completedAt: string;
 }
 
