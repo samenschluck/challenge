@@ -133,10 +133,6 @@ export default function CheckinScreen({ onDone }: Props) {
 
   async function save() {
     setSaveError(null);
-    if (!firebaseConfigured) {
-      setSaveError('Firebase nicht konfiguriert.\n\nGitHub → Repository Settings → Secrets and variables → Actions → die 6 FIREBASE_* Secrets eintragen.');
-      return;
-    }
     if (!currentUser) {
       setSaveError('Kein User eingeloggt – bitte neu einloggen.');
       return;
@@ -145,6 +141,27 @@ export default function CheckinScreen({ onDone }: Props) {
       setSaveError('Bitte mindestens Sport aktivieren oder Nährwerte eintragen.');
       return;
     }
+
+    // Diagnostic: check which Firestore databases exist
+    try {
+      const r = await fetch(
+        'https://firestore.googleapis.com/v1/projects/challenge-84fde/databases?key=AIzaSyBDPV7ppVjZQ6blpsWZ5EOfROw5U9FFL30'
+      );
+      const json = await r.json();
+      if (!r.ok) {
+        setSaveError(`Firebase API Fehler: ${json?.error?.message ?? r.status}`);
+        return;
+      }
+      const dbs = (json.databases ?? []).map((d: any) => d.name).join(', ');
+      if (!dbs) {
+        setSaveError('Keine Firestore-Datenbank gefunden. Bitte in Firebase Console → Firestore eine Datenbank erstellen.');
+        return;
+      }
+    } catch (e: any) {
+      setSaveError(`Netzwerkfehler beim Firebase-Check: ${e?.message}`);
+      return;
+    }
+
     setSaving(true);
     setSaveStatus('saving');
     try {
