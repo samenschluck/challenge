@@ -8,6 +8,11 @@ export async function upsertUser(user: User): Promise<void> {
   await set(ref(rtdb, `users/${user.id}`), user);
 }
 
+export async function getUser(userId: string): Promise<User | null> {
+  const snap = await get(ref(rtdb, `users/${userId}`));
+  return snap.exists() ? (snap.val() as User) : null;
+}
+
 export function subscribeUsers(cb: (users: User[]) => void) {
   return onValue(ref(rtdb, 'users'), snap => {
     const val = snap.val();

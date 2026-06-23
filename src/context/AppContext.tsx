@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, DayEntry } from '../types';
 import { loadUser, saveUser, clearUser } from '../utils/storage';
-import { upsertUser, subscribeUsers, subscribeAllEntriesForDate, subscribeUserEntries } from '../services/firestoreService';
+import { upsertUser, getUser, subscribeUsers, subscribeAllEntriesForDate, subscribeUserEntries } from '../services/firestoreService';
 import { getTodayString } from '../utils/dateUtils';
 
 interface AppContextType {
@@ -52,9 +52,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const todayMyEntry = todayEntries.find(e => e.userId === currentUser?.id) ?? null;
 
   async function setCurrentUser(user: User) {
-    await saveUser(user);
-    setCurrentUserState(user);
-    upsertUser(user).catch(() => {});
+    // Merge with existing data so settings (height/gender/age) survive re-login
+    let merged = user;
+    const existingInList = allUsers.find(u => u.id === user.id);
+    if (existingInList) {
+      merged = { ...existingInList, ...user };
+    } else {
+      // allUsers might not be loaded yet — fetch directly from Firebase
+      try {
+        const existing = await getUser(user.id);
+        if (existing) merged = { ...existing, ...user };
+      } catch {}
+    }
+    await saveUser(merged);
+    setCurrentUserState(merged);
+    upsertUser(merged).catch(() => {});
   }
 
   async function updateUserSettings(updates: { height?: number; gender?: 'male' | 'female'; age?: number }) {
