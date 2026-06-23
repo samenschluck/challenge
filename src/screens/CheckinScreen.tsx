@@ -136,7 +136,7 @@ export default function CheckinScreen({ onDone }: Props) {
         ...(workoutNotes ? { notes: workoutNotes } : {}),
       } : null;
 
-      const hasNutrition = !!(calories || protein || carbs || fat || water);
+      const hasNutrition = !!(calories || protein || carbs || fat || water || meals.length > 0);
       const nutrition: NutritionEntry | null = hasNutrition ? {
         calories: Number(calories) || 0,
         protein: Number(protein) || 0,
@@ -342,7 +342,8 @@ export default function CheckinScreen({ onDone }: Props) {
 
             {/* Debug: User info */}
             <Text style={styles.debugInfo}>
-              User: {currentUser ? currentUser.name : '❌ KEIN USER'} | Workout: {hasWorkout ? 'ja' : 'nein'}
+              User: {currentUser ? currentUser.name : '❌ KEIN USER'} | Workout: {hasWorkout ? 'ja' : 'nein'}{'\n'}
+              Kcal: "{calories}" | P: "{protein}" | K: "{carbs}" | F: "{fat}" | Mahlzeiten: {meals.length}
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>
