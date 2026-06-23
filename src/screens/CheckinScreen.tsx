@@ -126,7 +126,8 @@ export default function CheckinScreen({ onDone }: Props) {
     const updated = [...meals, meal];
     setMeals(updated);
     recalcTotals(updated);
-    setShowScanner(false);
+    // Do not close here — BarcodeScanner stays open briefly (success stage)
+    // to absorb ghost/phantom taps before calling onClose itself
   }
 
   async function save() {

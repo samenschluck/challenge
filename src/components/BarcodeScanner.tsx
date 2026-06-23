@@ -13,7 +13,7 @@ interface Props {
 
 const CDN_URL = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
 
-type Stage = 'loading-lib' | 'scanning' | 'fetching' | 'product' | 'not-found' | 'error';
+type Stage = 'loading-lib' | 'scanning' | 'fetching' | 'product' | 'not-found' | 'error' | 'success';
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -111,6 +111,9 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
       time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
     };
     onMealAdded(meal);
+    // Stay open briefly so any ghost/phantom tap hits this overlay, not elements below
+    setStage('success');
+    setTimeout(() => onClose(), 800);
   }
 
   function rescan() {
@@ -165,7 +168,8 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
             {stage === 'scanning' ? '📷 Barcode scannen' :
              stage === 'fetching' ? '🔍 Produkt laden…' :
              stage === 'product' ? '✅ Produkt gefunden' :
-             stage === 'not-found' ? '❌ Nicht gefunden' : '📷 Barcode scannen'}
+             stage === 'not-found' ? '❌ Nicht gefunden' :
+             stage === 'success' ? '✅ Hinzugefügt!' : '📷 Barcode scannen'}
           </Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
             <Text style={styles.closeText}>✕</Text>
@@ -253,8 +257,15 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
           </View>
         )}
 
-        {/* Manual input (always visible except when product shown) */}
-        {stage !== 'product' && (
+        {/* Success — stays open briefly to absorb ghost clicks */}
+        {stage === 'success' && (
+          <View style={styles.center}>
+            <Text style={styles.successText}>✅ Mahlzeit wurde zur Liste hinzugefügt!</Text>
+          </View>
+        )}
+
+        {/* Manual input (only while scanning / not-found / error) */}
+        {stage !== 'product' && stage !== 'success' && (
           <>
             <View style={styles.divider} />
             <Text style={styles.manualLabel}>Oder Barcode-Nummer eingeben:</Text>
@@ -321,6 +332,7 @@ const styles = StyleSheet.create({
   rescanBtn: { alignItems: 'center', padding: 10 },
   rescanBtnText: { color: COLORS.textSecondary, fontSize: 13 },
   errorText: { color: COLORS.danger, fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 12 },
+  successText: { color: COLORS.success, fontSize: 16, fontWeight: '700', textAlign: 'center', lineHeight: 24 },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
   manualLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 8 },
   manualRow: { flexDirection: 'row', gap: 8 },
