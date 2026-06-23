@@ -178,7 +178,7 @@ export default function CheckinScreen({ onDone }: Props) {
       );
       await Promise.race([saveDayEntry(entry), timeout]);
       setSaveStatus('done');
-      setTimeout(() => onDone(), 600);
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (e: any) {
       setSaveError(e?.message ?? 'Unbekannter Fehler');
       setSaveStatus('idle');
@@ -345,6 +345,13 @@ export default function CheckinScreen({ onDone }: Props) {
               />
             </View>
 
+            {/* Success Box */}
+            {saveStatus === 'done' && (
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>✅ Eintrag gespeichert! Du kannst weitere Mahlzeiten hinzufügen.</Text>
+              </View>
+            )}
+
             {/* Error Box */}
             {saveError && (
               <View style={styles.errorBox}>
@@ -465,6 +472,11 @@ const styles = StyleSheet.create({
   saveBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 8 },
   saveBtnGrad: { padding: 18, alignItems: 'center' },
   saveBtnText: { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  successBox: {
+    backgroundColor: COLORS.success + '22', borderRadius: 12, padding: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: COLORS.success + '88',
+  },
+  successText: { color: COLORS.success, fontSize: 13, lineHeight: 20 },
   errorBox: {
     backgroundColor: '#ff000033', borderRadius: 12, padding: 14,
     marginBottom: 12, borderWidth: 1, borderColor: '#ff4444',

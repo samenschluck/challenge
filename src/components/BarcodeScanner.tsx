@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Modal,
 } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { lookupBarcode, FoodProduct } from '../services/openFoodFacts';
@@ -160,6 +160,7 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
   const portionF = portionG / 100;
 
   return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
     <View style={styles.overlay}>
       <View style={styles.card}>
         {/* Header */}
@@ -290,17 +291,16 @@ export default function BarcodeScanner({ onMealAdded, onClose }: Props) {
         )}
       </View>
     </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute' as any,
-    top: 0, left: 0, right: 0, bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 999,
   },
   card: {
     width: '96%',
