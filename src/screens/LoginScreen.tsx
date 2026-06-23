@@ -10,9 +10,9 @@ import { useApp } from '../context/AppContext';
 import { getTodayDayNumber } from '../utils/dateUtils';
 
 const PRESET_USERS = [
-  { name: 'Leon', avatar: AVATARS[0], avatarColor: AVATAR_COLORS[0] },
-  { name: 'Max', avatar: AVATARS[1], avatarColor: AVATAR_COLORS[1] },
-  { name: 'Nico', avatar: AVATARS[2], avatarColor: AVATAR_COLORS[2] },
+  { name: 'FelsenFlade', avatar: AVATARS[0], avatarColor: AVATAR_COLORS[0] },
+  { name: 'EisenMote', avatar: AVATARS[1], avatarColor: AVATAR_COLORS[1] },
+  { name: 'Maximus', avatar: AVATARS[2], avatarColor: AVATAR_COLORS[2] },
 ];
 
 export default function LoginScreen() {
