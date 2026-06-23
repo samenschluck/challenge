@@ -133,7 +133,7 @@ export default function CheckinScreen({ onDone }: Props) {
         type: workoutType,
         duration: Number(workoutDuration) || 0,
         intensity,
-        notes: workoutNotes || undefined,
+        ...(workoutNotes ? { notes: workoutNotes } : {}),
       } : null;
 
       const hasNutrition = !!(calories || protein || carbs || fat || water);
@@ -153,7 +153,7 @@ export default function CheckinScreen({ onDone }: Props) {
         workout,
         nutrition,
         mood,
-        notes: notes || undefined,
+        ...(notes ? { notes } : {}),
         completedAt: new Date().toISOString(),
       };
 
