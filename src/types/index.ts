@@ -1,0 +1,45 @@
+export interface User {
+  id: string;
+  name: string;
+  avatar: string;
+  avatarColor: string;
+}
+
+export interface WorkoutEntry {
+  type: string;
+  duration: number;
+  intensity: 'leicht' | 'mittel' | 'intensiv';
+  notes?: string;
+}
+
+export interface NutritionEntry {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  water: number;
+  meals: Meal[];
+}
+
+export interface Meal {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  time: string;
+}
+
+export interface DayEntry {
+  id: string;
+  userId: string;
+  date: string;
+  workout: WorkoutEntry | null;
+  nutrition: NutritionEntry | null;
+  mood: 1 | 2 | 3 | 4 | 5;
+  notes?: string;
+  completedAt: string;
+}
+
+export type Screen = 'login' | 'home' | 'checkin' | 'calendar' | 'stats' | 'nutrition';
