@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { saveDayEntry } from '../services/firestoreService';
+import { firebaseConfigured } from '../config/firebase';
 import { getTodayString, formatDate } from '../utils/dateUtils';
 import { DayEntry, WorkoutEntry, NutritionEntry, Meal } from '../types';
 import BarcodeScanner from '../components/BarcodeScanner';
@@ -132,6 +133,10 @@ export default function CheckinScreen({ onDone }: Props) {
 
   async function save() {
     setSaveError(null);
+    if (!firebaseConfigured) {
+      setSaveError('Firebase nicht konfiguriert.\n\nGitHub → Repository Settings → Secrets and variables → Actions → die 6 FIREBASE_* Secrets eintragen.');
+      return;
+    }
     if (!currentUser) {
       setSaveError('Kein User eingeloggt – bitte neu einloggen.');
       return;
