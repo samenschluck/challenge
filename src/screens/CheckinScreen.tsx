@@ -149,10 +149,13 @@ export default function CheckinScreen({ onDone }: Props) {
         notes: notes || undefined,
         completedAt: new Date().toISOString(),
       };
-      await saveDayEntry(entry);
+      // Sofort navigieren, Firebase im Hintergrund
       onDone();
+      saveDayEntry(entry).catch(() => {
+        Alert.alert('Sync-Fehler', 'Eintrag gespeichert, aber Sync fehlgeschlagen. Wird automatisch wiederholt.');
+      });
     } catch (e) {
-      Alert.alert('Fehler', 'Speichern fehlgeschlagen. Prüfe deine Firebase-Verbindung.');
+      Alert.alert('Fehler', 'Etwas ist schiefgelaufen.');
     } finally {
       setSaving(false);
     }

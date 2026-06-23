@@ -51,9 +51,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const todayMyEntry = todayEntries.find(e => e.userId === currentUser?.id) ?? null;
 
   async function setCurrentUser(user: User) {
+    // Sofort lokal speichern und UI aktualisieren – Firebase im Hintergrund
     await saveUser(user);
-    await upsertUser(user);
     setCurrentUserState(user);
+    upsertUser(user).catch(() => {}); // fire-and-forget
   }
 
   function logout() {
