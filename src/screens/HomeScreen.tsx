@@ -8,6 +8,7 @@ import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import UserDayCard from '../components/UserDayCard';
 import { formatDate, getTodayString, getTodayDayNumber, getDaysRemaining, getProgressPercent } from '../utils/dateUtils';
+import { firebaseProjectId } from '../config/firebase';
 
 interface Props {
   onGoCheckin: () => void;
@@ -107,6 +108,16 @@ export default function HomeScreen({ onGoCheckin }: Props) {
           {currentUser && !allUsers.find(u => u.id === currentUser.id) && (
             <UserDayCard user={currentUser} entry={myEntry} isMe />
           )}
+
+          {/* DEBUG – wird später entfernt */}
+          <View style={styles.debugBox}>
+            <Text style={styles.debugText}>
+              🔧 Firebase: {firebaseProjectId ? `✅ ${firebaseProjectId}` : '❌ NICHT GELADEN'}
+            </Text>
+            <Text style={styles.debugText}>
+              👥 Users: {allUsers.length} | 📋 Heute: {todayEntries.length}
+            </Text>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -137,4 +148,6 @@ const styles = StyleSheet.create({
   doneText: { color: COLORS.successLight, fontWeight: '700', fontSize: 15 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 12 },
   emptyHint: { color: COLORS.textMuted, textAlign: 'center', fontSize: 14, marginTop: 20 },
+  debugBox: { marginTop: 20, padding: 10, backgroundColor: '#1a1a2e', borderRadius: 10, borderWidth: 1, borderColor: '#333' },
+  debugText: { color: '#888', fontSize: 11, marginBottom: 2 },
 });
