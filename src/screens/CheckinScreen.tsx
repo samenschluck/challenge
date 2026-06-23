@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView,
-  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform, Alert,
+  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
@@ -77,6 +77,8 @@ export default function CheckinScreen({ onDone }: Props) {
   const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>((todayMyEntry?.mood as any) ?? 3);
   const [notes, setNotes] = useState(todayMyEntry?.notes ?? '');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done'>('idle');
 
   function addMeal() {
     if (!mealName.trim()) return;
@@ -115,12 +117,17 @@ export default function CheckinScreen({ onDone }: Props) {
   }
 
   async function save() {
-    if (!currentUser) return;
+    setSaveError(null);
+    if (!currentUser) {
+      setSaveError('Kein User eingeloggt – bitte neu einloggen.');
+      return;
+    }
     if (!hasWorkout && !calories && !protein && !carbs && !fat && !water) {
-      Alert.alert('Hinweis', 'Bitte mindestens Sport oder Nährwerte eintragen.');
+      setSaveError('Bitte mindestens Sport aktivieren oder Nährwerte eintragen.');
       return;
     }
     setSaving(true);
+    setSaveStatus('saving');
     try {
       const workout: WorkoutEntry | null = hasWorkout ? {
         type: workoutType,
@@ -151,16 +158,14 @@ export default function CheckinScreen({ onDone }: Props) {
       };
 
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout – Keine Verbindung zu Firebase')), 8000)
+        setTimeout(() => reject(new Error('Timeout – Firebase nicht erreichbar. Prüfe deine Firestore-Regeln: Firebase Console → Firestore → Regeln → allow read, write: if true')), 8000)
       );
       await Promise.race([saveDayEntry(entry), timeout]);
-      onDone();
+      setSaveStatus('done');
+      setTimeout(() => onDone(), 500);
     } catch (e: any) {
-      const msg = e?.message ?? 'Unbekannter Fehler';
-      Alert.alert(
-        'Speichern fehlgeschlagen',
-        msg + '\n\nBitte prüfe deine Firestore-Regeln in der Firebase Console (Firestore → Regeln → allow read, write: if true)',
-      );
+      setSaveError((e?.message ?? 'Unbekannter Fehler') + '\n\nFirebase Console → Firestore → Regeln → allow read, write: if true');
+      setSaveStatus('idle');
     } finally {
       setSaving(false);
     }
@@ -309,12 +314,36 @@ export default function CheckinScreen({ onDone }: Props) {
               />
             </View>
 
+            {/* Error Box */}
+            {saveError && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {saveError}</Text>
+              </View>
+            )}
+
             {/* Save Button */}
-            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
-              <LinearGradient colors={[COLORS.primary, COLORS.primaryLight]} style={styles.saveBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                <Text style={styles.saveBtnText}>{saving ? 'Speichern...' : '✓ Eintragen & Speichern'}</Text>
+            <TouchableOpacity
+              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+              onPress={save}
+              disabled={saving}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={saveStatus === 'done' ? ['#22c55e', '#16a34a'] : [COLORS.primary, COLORS.primaryLight]}
+                style={styles.saveBtnGrad}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.saveBtnText}>
+                  {saveStatus === 'done' ? '✅ Gespeichert!' : saving ? '⏳ Speichern...' : '✓ Eintragen & Speichern'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Debug: User info */}
+            <Text style={styles.debugInfo}>
+              User: {currentUser ? currentUser.name : '❌ KEIN USER'} | Workout: {hasWorkout ? 'ja' : 'nein'}
+            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -368,4 +397,7 @@ const styles = StyleSheet.create({
   saveBtn: { borderRadius: 16, overflow: 'hidden', marginTop: 8 },
   saveBtnGrad: { padding: 18, alignItems: 'center' },
   saveBtnText: { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  errorBox: { backgroundColor: '#ff000033', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#ff4444' },
+  errorText: { color: '#ff6666', fontSize: 13, lineHeight: 20 },
+  debugInfo: { color: '#555', fontSize: 10, textAlign: 'center', marginTop: 8 },
 });
