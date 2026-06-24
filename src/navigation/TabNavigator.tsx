@@ -17,13 +17,24 @@ const TABS = [
 
 export default function TabNavigator() {
   const [activeTab, setActiveTab] = useState<Tab>('home');
+  const [checkinDate, setCheckinDate] = useState<string | undefined>(undefined);
+
+  function goCheckin(date?: string) {
+    setCheckinDate(date);
+    setActiveTab('checkin');
+  }
+
+  function handleTabPress(tab: Tab) {
+    if (tab !== 'checkin') setCheckinDate(undefined);
+    setActiveTab(tab);
+  }
 
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        {activeTab === 'home' && <HomeScreen onGoCheckin={() => setActiveTab('checkin')} />}
-        {activeTab === 'checkin' && <CheckinScreen onDone={() => setActiveTab('home')} />}
-        {activeTab === 'calendar' && <CalendarScreen />}
+        {activeTab === 'home' && <HomeScreen onGoCheckin={() => goCheckin()} />}
+        {activeTab === 'checkin' && <CheckinScreen date={checkinDate} onDone={() => { setCheckinDate(undefined); setActiveTab('home'); }} />}
+        {activeTab === 'calendar' && <CalendarScreen onEditDay={(date) => goCheckin(date)} />}
         {activeTab === 'stats' && <StatsScreen />}
       </View>
 
@@ -32,7 +43,7 @@ export default function TabNavigator() {
           <TouchableOpacity
             key={tab.key}
             style={styles.tabItem}
-            onPress={() => setActiveTab(tab.key as Tab)}
+            onPress={() => handleTabPress(tab.key as Tab)}
           >
             <Text style={styles.tabIcon}>{tab.icon}</Text>
             <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>

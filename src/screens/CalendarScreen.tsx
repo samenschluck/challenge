@@ -8,14 +8,12 @@ import { useApp } from '../context/AppContext';
 import { DayEntry, User } from '../types';
 import { getDayNumber, formatDate, getTodayString } from '../utils/dateUtils';
 
-function getDayStatus(entries: DayEntry[], userId: string, date: string): 'full' | 'partial' | 'none' | 'future' {
+function getDayStatus(entries: DayEntry[], userId: string, date: string): 'full' | 'none' | 'future' {
   const today = getTodayString();
   if (date > today) return 'future';
   if (date < CHALLENGE_START || date > CHALLENGE_END) return 'future';
   const entry = entries.find(e => e.userId === userId && e.date === date);
-  if (!entry) return 'none';
-  if (entry.workout) return 'full';
-  if (entry.nutrition) return 'partial';
+  if (entry?.workout) return 'full';
   return 'none';
 }
 
@@ -47,12 +45,15 @@ function groupByWeek(days: string[]): string[][] {
 
 const STATUS_COLORS = {
   full: COLORS.success,
-  partial: COLORS.warning,
   none: COLORS.danger,
   future: COLORS.cardLight,
 };
 
-export default function CalendarScreen() {
+interface Props {
+  onEditDay?: (date: string) => void;
+}
+
+export default function CalendarScreen({ onEditDay }: Props) {
   const { currentUser, myEntries, allUsers, todayEntries } = useApp();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -62,6 +63,9 @@ export default function CalendarScreen() {
 
   const viewUser = selectedUser ?? currentUser;
   const today = getTodayString();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
 
   // Get all entries for view user from context (myEntries if it's me, or todayEntries for others)
   const relevantEntries = viewUser?.id === currentUser?.id
@@ -138,8 +142,7 @@ export default function CalendarScreen() {
           {/* Legend */}
           <View style={styles.legend}>
             {[
-              { color: STATUS_COLORS.full, label: 'Komplett' },
-              { color: STATUS_COLORS.partial, label: 'Teilweise' },
+              { color: STATUS_COLORS.full, label: 'Trainiert ✓' },
               { color: STATUS_COLORS.none, label: 'Verpasst' },
               { color: STATUS_COLORS.future, label: 'Ausstehend' },
             ].map(l => (
@@ -187,7 +190,14 @@ export default function CalendarScreen() {
           {/* Day detail */}
           {selectedDay && (
             <View style={styles.dayDetail}>
-              <Text style={styles.dayDetailTitle}>{formatDate(selectedDay)}</Text>
+              <View style={styles.dayDetailHeader}>
+                <Text style={styles.dayDetailTitle}>{formatDate(selectedDay)}</Text>
+                {selectedDay === yesterdayStr && viewUser?.id === currentUser?.id && onEditDay && (
+                  <TouchableOpacity style={styles.editBtn} onPress={() => onEditDay(selectedDay)}>
+                    <Text style={styles.editBtnText}>✏️ Bearbeiten</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               {dayEntry ? (
                 <>
                   {dayEntry.workout && (
@@ -257,7 +267,10 @@ const styles = StyleSheet.create({
   dayNumFuture: { color: COLORS.textMuted },
   statusDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   dayDetail: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginTop: 16, borderWidth: 1, borderColor: COLORS.border },
-  dayDetailTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 12 },
+  dayDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  dayDetailTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text },
+  editBtn: { backgroundColor: COLORS.primary + '22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: COLORS.primary + '66' },
+  editBtnText: { color: COLORS.primaryLight, fontSize: 13, fontWeight: '700' },
   detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
   detailIcon: { fontSize: 18 },
   detailText: { flex: 1, fontSize: 14, color: COLORS.textSecondary, lineHeight: 20 },

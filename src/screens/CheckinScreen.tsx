@@ -21,6 +21,7 @@ const MOODS = ['😴', '😐', '🙂', '😊', '🔥'];
 
 interface Props {
   onDone: () => void;
+  date?: string;
 }
 
 function SectionHeader({ icon, title }: { icon: string; title: string }) {
@@ -32,31 +33,36 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
   );
 }
 
-export default function CheckinScreen({ onDone }: Props) {
-  const { currentUser, todayMyEntry } = useApp();
+export default function CheckinScreen({ onDone, date }: Props) {
+  const { currentUser, todayMyEntry, myEntries } = useApp();
   const today = getTodayString();
+  const targetDate = date ?? today;
+  const isEditingPast = targetDate !== today;
+  const targetEntry = isEditingPast
+    ? (myEntries.find(e => e.date === targetDate) ?? null)
+    : todayMyEntry;
 
   // Sport
-  const [hasWorkout, setHasWorkout] = useState(!!todayMyEntry?.workout);
-  const [workoutType, setWorkoutType] = useState(todayMyEntry?.workout?.type ?? 'Krafttraining');
-  const [workoutDuration, setWorkoutDuration] = useState(String(todayMyEntry?.workout?.duration ?? '60'));
-  const [intensity, setIntensity] = useState<'leicht' | 'mittel' | 'intensiv'>(todayMyEntry?.workout?.intensity ?? 'mittel');
-  const [workoutNotes, setWorkoutNotes] = useState(todayMyEntry?.workout?.notes ?? '');
+  const [hasWorkout, setHasWorkout] = useState(!!targetEntry?.workout);
+  const [workoutType, setWorkoutType] = useState(targetEntry?.workout?.type ?? 'Krafttraining');
+  const [workoutDuration, setWorkoutDuration] = useState(String(targetEntry?.workout?.duration ?? '60'));
+  const [intensity, setIntensity] = useState<'leicht' | 'mittel' | 'intensiv'>(targetEntry?.workout?.intensity ?? 'mittel');
+  const [workoutNotes, setWorkoutNotes] = useState(targetEntry?.workout?.notes ?? '');
 
   // Meals & water
-  const [meals, setMeals] = useState<Meal[]>(todayMyEntry?.nutrition?.meals ?? []);
-  const [water, setWater] = useState(todayMyEntry?.nutrition?.water ? String(todayMyEntry.nutrition.water) : '');
+  const [meals, setMeals] = useState<Meal[]>(targetEntry?.nutrition?.meals ?? []);
+  const [water, setWater] = useState(targetEntry?.nutrition?.water ? String(targetEntry.nutrition.water) : '');
 
   // Weight
-  const [weight, setWeight] = useState(todayMyEntry?.weight ? String(todayMyEntry.weight) : '');
+  const [weight, setWeight] = useState(targetEntry?.weight ? String(targetEntry.weight) : '');
 
   // Meal modal state
   const [showAddMeal, setShowAddMeal] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
 
   // Mood & notes
-  const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>((todayMyEntry?.mood as any) ?? 3);
-  const [notes, setNotes] = useState(todayMyEntry?.notes ?? '');
+  const [mood, setMood] = useState<1 | 2 | 3 | 4 | 5>((targetEntry?.mood as any) ?? 3);
+  const [notes, setNotes] = useState(targetEntry?.notes ?? '');
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -124,9 +130,9 @@ export default function CheckinScreen({ onDone }: Props) {
       } : null;
 
       const entry: DayEntry = {
-        id: `${currentUser.id}_${today}`,
+        id: `${currentUser.id}_${targetDate}`,
         userId: currentUser.id,
-        date: today,
+        date: targetDate,
         workout,
         nutrition,
         mood,
@@ -151,8 +157,8 @@ export default function CheckinScreen({ onDone }: Props) {
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-            <Text style={styles.title}>Tages-Check-in</Text>
-            <Text style={styles.subtitle}>{formatDate(today)}</Text>
+            <Text style={styles.title}>{isEditingPast ? '✏️ Eintrag bearbeiten' : 'Tages-Check-in'}</Text>
+            <Text style={styles.subtitle}>{formatDate(targetDate)}</Text>
 
             {/* ── GEWICHT ── */}
             <View style={styles.card}>
