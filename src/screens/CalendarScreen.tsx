@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, Modal,
+  View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, CHALLENGE_START, CHALLENGE_END } from '../constants/theme';
 import { useApp } from '../context/AppContext';
+import { subscribeUserEntries } from '../services/firestoreService';
 import { DayEntry, User } from '../types';
 import { getDayNumber, formatDate, getTodayString } from '../utils/dateUtils';
 
@@ -33,7 +34,7 @@ function groupByWeek(days: string[]): string[][] {
   const weeks: string[][] = [];
   let week: string[] = [];
   const firstDay = new Date(days[0]);
-  const dayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Mon=0
+  const dayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
   for (let i = 0; i < dayOfWeek; i++) week.push('');
   for (const d of days) {
     week.push(d);
@@ -41,6 +42,17 @@ function groupByWeek(days: string[]): string[][] {
   }
   if (week.length > 0) { while (week.length < 7) week.push(''); weeks.push(week); }
   return weeks;
+}
+
+// Use local date to match how users think about "today" and "yesterday"
+function getLocalDateString(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 const STATUS_COLORS = {
@@ -54,33 +66,38 @@ interface Props {
 }
 
 export default function CalendarScreen({ onEditDay }: Props) {
-  const { currentUser, myEntries, allUsers, todayEntries } = useApp();
+  const { currentUser, myEntries, allUsers } = useApp();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [otherUserEntries, setOtherUserEntries] = useState<DayEntry[]>([]);
 
   const allDays = useMemo(() => generateCalendarDays(), []);
   const weeks = useMemo(() => groupByWeek(allDays), [allDays]);
 
   const viewUser = selectedUser ?? currentUser;
   const today = getTodayString();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayStr = getLocalDateString(-1);
 
-  // Get all entries for view user from context (myEntries if it's me, or todayEntries for others)
-  const relevantEntries = viewUser?.id === currentUser?.id
-    ? myEntries
-    : todayEntries; // simplified: for others we only have today's
+  // Subscribe to the viewed user's full entry history when it's not the current user
+  useEffect(() => {
+    if (!viewUser || viewUser.id === currentUser?.id) {
+      setOtherUserEntries([]);
+      return;
+    }
+    const unsub = subscribeUserEntries(viewUser.id, setOtherUserEntries);
+    return unsub;
+  }, [viewUser?.id, currentUser?.id]);
+
+  const relevantEntries = viewUser?.id === currentUser?.id ? myEntries : otherUserEntries;
 
   function getEntry(date: string) {
     return relevantEntries.find(e => e.userId === viewUser?.id && e.date === date) ?? null;
   }
 
   const totalDays = allDays.filter(d => d <= today && d >= CHALLENGE_START).length;
-  const fullDays = allDays.filter(d => {
-    const status = getDayStatus(relevantEntries, viewUser?.id ?? '', d);
-    return status === 'full';
-  }).length;
+  const fullDays = allDays.filter(d =>
+    getDayStatus(relevantEntries, viewUser?.id ?? '', d) === 'full'
+  ).length;
 
   const streak = useMemo(() => {
     let s = 0;
@@ -88,14 +105,16 @@ export default function CalendarScreen({ onEditDay }: Props) {
     while (true) {
       const d = cur.toISOString().split('T')[0];
       if (d < CHALLENGE_START) break;
-      const status = getDayStatus(relevantEntries, viewUser?.id ?? '', d);
-      if (status === 'full') { s++; cur.setDate(cur.getDate() - 1); }
-      else break;
+      if (getDayStatus(relevantEntries, viewUser?.id ?? '', d) === 'full') {
+        s++;
+        cur.setDate(cur.getDate() - 1);
+      } else break;
     }
     return s;
   }, [relevantEntries, viewUser]);
 
   const dayEntry = selectedDay ? getEntry(selectedDay) : null;
+  const canEditSelected = selectedDay === yesterdayStr && viewUser?.id === currentUser?.id && !!onEditDay;
 
   return (
     <LinearGradient colors={['#0f0f1a', '#0f0f1a']} style={{ flex: 1 }}>
@@ -110,7 +129,7 @@ export default function CalendarScreen({ onEditDay }: Props) {
                 <TouchableOpacity
                   key={u.id}
                   style={[styles.userPill, viewUser?.id === u.id && styles.userPillActive]}
-                  onPress={() => setSelectedUser(u.id === currentUser?.id ? null : u)}
+                  onPress={() => { setSelectedUser(u.id === currentUser?.id ? null : u); setSelectedDay(null); }}
                 >
                   <Text style={styles.userPillAvatar}>{u.avatar}</Text>
                   <Text style={[styles.userPillName, viewUser?.id === u.id && styles.userPillNameActive]}>{u.name}</Text>
@@ -127,7 +146,7 @@ export default function CalendarScreen({ onEditDay }: Props) {
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statNum}>{fullDays}</Text>
-              <Text style={styles.statLabel}>✅ Komplett</Text>
+              <Text style={styles.statLabel}>✅ Trainiert</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statNum}>{totalDays - fullDays}</Text>
@@ -142,7 +161,7 @@ export default function CalendarScreen({ onEditDay }: Props) {
           {/* Legend */}
           <View style={styles.legend}>
             {[
-              { color: STATUS_COLORS.full, label: 'Trainiert ✓' },
+              { color: STATUS_COLORS.full, label: 'Trainiert' },
               { color: STATUS_COLORS.none, label: 'Verpasst' },
               { color: STATUS_COLORS.future, label: 'Ausstehend' },
             ].map(l => (
@@ -192,12 +211,13 @@ export default function CalendarScreen({ onEditDay }: Props) {
             <View style={styles.dayDetail}>
               <View style={styles.dayDetailHeader}>
                 <Text style={styles.dayDetailTitle}>{formatDate(selectedDay)}</Text>
-                {selectedDay === yesterdayStr && viewUser?.id === currentUser?.id && onEditDay && (
-                  <TouchableOpacity style={styles.editBtn} onPress={() => onEditDay(selectedDay)}>
+                {canEditSelected && (
+                  <TouchableOpacity style={styles.editBtn} onPress={() => onEditDay!(selectedDay)}>
                     <Text style={styles.editBtnText}>✏️ Bearbeiten</Text>
                   </TouchableOpacity>
                 )}
               </View>
+
               {dayEntry ? (
                 <>
                   {dayEntry.workout && (
@@ -212,6 +232,12 @@ export default function CalendarScreen({ onEditDay }: Props) {
                       <Text style={styles.detailText}>
                         {dayEntry.nutrition.calories} kcal · P:{dayEntry.nutrition.protein}g · K:{dayEntry.nutrition.carbs}g · F:{dayEntry.nutrition.fat}g
                       </Text>
+                    </View>
+                  )}
+                  {dayEntry.weight && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailIcon}>⚖️</Text>
+                      <Text style={styles.detailText}>{dayEntry.weight} kg</Text>
                     </View>
                   )}
                   {dayEntry.mood && (
@@ -231,6 +257,12 @@ export default function CalendarScreen({ onEditDay }: Props) {
                 <Text style={styles.noEntryText}>
                   {selectedDay > today ? 'Noch in der Zukunft' : 'Kein Eintrag für diesen Tag'}
                 </Text>
+              )}
+
+              {canEditSelected && !dayEntry && (
+                <TouchableOpacity style={[styles.editBtn, { marginTop: 10, alignSelf: 'center' }]} onPress={() => onEditDay!(selectedDay)}>
+                  <Text style={styles.editBtnText}>✏️ Gestern nachtragen</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -268,7 +300,7 @@ const styles = StyleSheet.create({
   statusDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   dayDetail: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginTop: 16, borderWidth: 1, borderColor: COLORS.border },
   dayDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  dayDetailTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text },
+  dayDetailTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, flex: 1 },
   editBtn: { backgroundColor: COLORS.primary + '22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: COLORS.primary + '66' },
   editBtnText: { color: COLORS.primaryLight, fontSize: 13, fontWeight: '700' },
   detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
