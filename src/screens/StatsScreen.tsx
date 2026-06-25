@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, CHALLENGE_START } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { DayEntry, User } from '../types';
-import { getTodayString } from '../utils/dateUtils';
+import { getTodayString, calcStreak } from '../utils/dateUtils';
 import { displayName } from '../utils/displayName';
 import {
   SPORT_TITLES, getTitleByKey, getLevelFromXp, getXpProgress,
@@ -19,24 +19,9 @@ const SPORT_EMOJIS: Record<string, string> = {
   'Kampfsport': '🥋', 'Vikings Training': '🪓', 'Sonstiges': '🤸',
 };
 
-function calcStreak(entries: DayEntry[], userId: string): number {
-  const today = getTodayString();
-  let streak = 0;
-  const cur = new Date(today);
-  while (true) {
-    const d = cur.toISOString().split('T')[0];
-    if (d < CHALLENGE_START) break;
-    const e = entries.find(x => x.userId === userId && x.date === d);
-    if (e?.workout) {
-      streak++;
-      cur.setDate(cur.getDate() - 1);
-    } else if (d === today) {
-      cur.setDate(cur.getDate() - 1); // Today still open — skip, don't break
-    } else {
-      break;
-    }
-  }
-  return streak;
+function getStreakForUser(entries: DayEntry[], userId: string): number {
+  const trainedDates = new Set(entries.filter(e => e.userId === userId && e.workout).map(e => e.date));
+  return calcStreak(trainedDates);
 }
 
 function calcStats(entries: DayEntry[], userId: string) {
@@ -88,7 +73,7 @@ export default function StatsScreen() {
     (new Date(today).getTime() - new Date(CHALLENGE_START).getTime()) / (1000 * 60 * 60 * 24)
   ) + 1);
 
-  const myStreak = useMemo(() => calcStreak(myEntries, currentUser?.id ?? ''), [myEntries, currentUser]);
+  const myStreak = useMemo(() => getStreakForUser(myEntries, currentUser?.id ?? ''), [myEntries, currentUser]);
   const myStats = useMemo(() => calcStats(myEntries, currentUser?.id ?? ''), [myEntries, currentUser]);
 
   const displayUsers = useMemo(() => {
@@ -189,7 +174,7 @@ export default function StatsScreen() {
                 const topLevel = topSport ? getLevelFromXp(topSport[1]) : 0;
                 const titleDef = u.title ? getTitleByKey(u.title) : undefined;
                 const isMe = u.id === currentUser?.id;
-                const streak = isMe ? myStreak : 0;
+                const streak = isMe ? myStreak : (u.streak ?? 0);
                 return (
                   <View key={u.id} style={[styles.leaderRow, i === 0 && styles.leaderFirst]}>
                     <Text style={styles.leaderRank}>{RANK_ICONS[i] ?? `${i + 1}.`}</Text>

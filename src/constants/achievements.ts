@@ -1,7 +1,6 @@
 import { DayEntry } from '../types';
 import { getLevelFromXp } from './titles';
-import { CHALLENGE_START } from './theme';
-import { getTodayString, getDayNumber } from '../utils/dateUtils';
+import { getDayNumber, calcStreak } from '../utils/dateUtils';
 
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
 
@@ -88,23 +87,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
 ];
 
 function calcStreakFromEntries(entries: DayEntry[]): number {
-  const today = getTodayString();
   const trainedDates = new Set(entries.filter(e => e.workout).map(e => e.date));
-  let streak = 0;
-  const cur = new Date(today);
-  while (true) {
-    const d = cur.toISOString().split('T')[0];
-    if (d < CHALLENGE_START) break;
-    if (trainedDates.has(d)) {
-      streak++;
-      cur.setDate(cur.getDate() - 1);
-    } else if (d === today) {
-      cur.setDate(cur.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-  return streak;
+  return calcStreak(trainedDates);
 }
 
 export function computeUnlockedAchievements(

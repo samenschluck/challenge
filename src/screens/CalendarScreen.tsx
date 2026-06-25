@@ -7,7 +7,7 @@ import { COLORS, CHALLENGE_START, CHALLENGE_END } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { subscribeUserEntries } from '../services/firestoreService';
 import { DayEntry, User, Workout, WorkoutEntry } from '../types';
-import { getDayNumber, formatDate, getTodayString } from '../utils/dateUtils';
+import { getDayNumber, formatDate, getTodayString, calcStreak } from '../utils/dateUtils';
 import { displayName } from '../utils/displayName';
 
 function getWorkouts(w: WorkoutEntry): Workout[] {
@@ -110,23 +110,10 @@ export default function CalendarScreen({ onEditDay }: Props) {
   const missedDays = totalDays - fullPast;
 
   const streak = useMemo(() => {
-    let s = 0;
-    const cur = new Date(today);
-    while (true) {
-      const d = cur.toISOString().split('T')[0];
-      if (d < CHALLENGE_START) break;
-      const status = getDayStatus(relevantEntries, viewUser?.id ?? '', d);
-      if (status === 'full') {
-        s++;
-        cur.setDate(cur.getDate() - 1);
-      } else if (d === today) {
-        // Today not trained yet — skip it, don't break streak
-        cur.setDate(cur.getDate() - 1);
-      } else {
-        break;
-      }
-    }
-    return s;
+    const trainedDates = new Set(
+      relevantEntries.filter(e => e.userId === (viewUser?.id ?? '') && e.workout).map(e => e.date),
+    );
+    return calcStreak(trainedDates);
   }, [relevantEntries, viewUser]);
 
   const dayEntry = selectedDay ? getEntry(selectedDay) : null;

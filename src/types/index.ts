@@ -8,6 +8,7 @@ export interface User {
   age?: number;
   title?: string;
   sportXp?: Record<string, number>;
+  streak?: number;
 }
 
 export interface Workout {

@@ -4,6 +4,7 @@ import { loadUser, saveUser, clearUser } from '../utils/storage';
 import { upsertUser, getUser, subscribeUsers, subscribeAllEntriesForDate, subscribeUserEntries } from '../services/firestoreService';
 import { getTodayString } from '../utils/dateUtils';
 import { computeSportXp } from '../constants/titles';
+import { calcStreak } from '../utils/dateUtils';
 import { ACHIEVEMENTS, AchievementDef, computeUnlockedAchievements } from '../constants/achievements';
 import AchievementToast from '../components/AchievementToast';
 
@@ -60,18 +61,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const mySportXp = useMemo(() => computeSportXp(myEntries), [myEntries]);
 
-  // Auto-sync sportXp to Firebase whenever it changes
+  // Auto-sync sportXp + streak to Firebase whenever they change
   const lastSyncedXpRef = useRef<string>('');
   useEffect(() => {
     if (!currentUser || !myEntries.length) return;
-    const xpStr = JSON.stringify(mySportXp);
+    const trainedDates = new Set(myEntries.filter(e => e.workout).map(e => e.date));
+    const streak = calcStreak(trainedDates);
+    const xpStr = JSON.stringify(mySportXp) + streak;
     if (xpStr === lastSyncedXpRef.current) return;
     lastSyncedXpRef.current = xpStr;
-    const updated: User = { ...currentUser, sportXp: mySportXp };
+    const updated: User = { ...currentUser, sportXp: mySportXp, streak };
     setCurrentUserState(updated);
     saveUser(updated);
     upsertUser(updated).catch(() => {});
-  }, [mySportXp]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mySportXp, myEntries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute achievements and detect newly unlocked ones
   const myAchievements = useMemo(

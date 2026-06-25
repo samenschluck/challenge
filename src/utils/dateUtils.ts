@@ -40,3 +40,26 @@ export function getProgressPercent(): number {
   const day = getTodayDayNumber();
   return Math.min(100, Math.max(0, (day / 100) * 100));
 }
+
+// Streak = longest consecutive run ending at the most-recently-trained date.
+// Starts from the last day with a workout (not from today), so retroactively
+// logged days count correctly even when today hasn't been logged yet.
+export function calcStreak(trainedDates: Set<string>): number {
+  const today = getTodayString();
+  const valid = [...trainedDates].filter(d => d <= today && d >= CHALLENGE_START);
+  if (!valid.length) return 0;
+  const latest = valid.sort().pop()!;
+  let streak = 0;
+  let cur = latest;
+  while (cur >= CHALLENGE_START) {
+    if (trainedDates.has(cur)) {
+      streak++;
+      const d = new Date(cur + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() - 1);
+      cur = d.toISOString().split('T')[0];
+    } else {
+      break;
+    }
+  }
+  return streak;
+}

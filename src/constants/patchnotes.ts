@@ -6,6 +6,15 @@ export interface PatchNote {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: '1.5.0',
+    date: '25.06.2026',
+    changes: [
+      'Streak-Fix 🔥: Nachgetragene Trainings werden jetzt korrekt als Streak gezählt',
+      'Streak startet ab dem letzten Trainingstag – nicht heute – damit Rückwärts-Einträge greifen',
+      'Leaderboard zeigt jetzt die echten Streaks aller Teilnehmer (nicht nur den eigenen)',
+    ],
+  },
+  {
     version: '1.4.0',
     date: '25.06.2026',
     changes: [
