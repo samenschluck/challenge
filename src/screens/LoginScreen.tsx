@@ -8,6 +8,8 @@ import { COLORS, AVATARS, AVATAR_COLORS } from '../constants/theme';
 import { User } from '../types';
 import { useApp } from '../context/AppContext';
 import { getTodayDayNumber } from '../utils/dateUtils';
+import { displayName } from '../utils/displayName';
+import { getTitleByKey } from '../constants/titles';
 
 const PRESET_USERS = [
   { name: 'FelsenFlade', avatar: AVATARS[0], avatarColor: AVATAR_COLORS[0] },
@@ -16,7 +18,7 @@ const PRESET_USERS = [
 ];
 
 export default function LoginScreen() {
-  const { setCurrentUser } = useApp();
+  const { setCurrentUser, allUsers } = useApp();
   const [customName, setCustomName] = useState('');
   const [showCustom, setShowCustom] = useState(false);
   const dayNum = getTodayDayNumber();
@@ -45,15 +47,28 @@ export default function LoginScreen() {
 
             <Text style={styles.sectionLabel}>Wer bist du?</Text>
 
-            {PRESET_USERS.map(u => (
-              <TouchableOpacity key={u.name} style={styles.userCard} onPress={() => pickUser(u.name, u.avatar, u.avatarColor)}>
-                <View style={[styles.avatarCircle, { backgroundColor: u.avatarColor + '33', borderColor: u.avatarColor }]}>
-                  <Text style={styles.avatarEmoji}>{u.avatar}</Text>
-                </View>
-                <Text style={styles.userName}>{u.name}</Text>
-                <Text style={styles.arrow}>→</Text>
-              </TouchableOpacity>
-            ))}
+            {PRESET_USERS.map(u => {
+              const fbUser = allUsers.find(fu => fu.id === u.name.toLowerCase().trim());
+              const titleDef = fbUser?.title ? getTitleByKey(fbUser.title) : undefined;
+              return (
+                <TouchableOpacity key={u.name} style={styles.userCard} onPress={() => pickUser(u.name, u.avatar, u.avatarColor)}>
+                  <View style={[styles.avatarCircle, { backgroundColor: u.avatarColor + '33', borderColor: u.avatarColor }]}>
+                    <Text style={styles.avatarEmoji}>{u.avatar}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    {titleDef && (
+                      <View style={[styles.titleBadge, titleDef.key === 'black' && styles.titleBadgeBlack]}>
+                        <Text style={[styles.titleBadgeText, titleDef.key === 'black' && styles.titleBadgeTextBlack]}>
+                          {titleDef.emoji} {titleDef.label}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={styles.userName}>{u.name}</Text>
+                  </View>
+                  <Text style={styles.arrow}>→</Text>
+                </TouchableOpacity>
+              );
+            })}
 
             <TouchableOpacity style={styles.customBtn} onPress={() => setShowCustom(!showCustom)}>
               <Text style={styles.customBtnText}>+ Anderen Namen eingeben</Text>
@@ -108,7 +123,15 @@ const styles = StyleSheet.create({
     borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 16,
   },
   avatarEmoji: { fontSize: 26 },
-  userName: { flex: 1, fontSize: 20, fontWeight: '700', color: COLORS.text },
+  userName: { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  titleBadge: {
+    alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 10, backgroundColor: COLORS.primary + '33',
+    borderWidth: 1, borderColor: COLORS.primary + '66', marginBottom: 4,
+  },
+  titleBadgeBlack: { backgroundColor: '#111', borderColor: '#444' },
+  titleBadgeText: { fontSize: 11, fontWeight: '800', color: COLORS.primaryLight },
+  titleBadgeTextBlack: { color: '#ffd700' },
   arrow: { fontSize: 20, color: COLORS.primary },
   customBtn: { marginTop: 8, alignItems: 'center', padding: 12 },
   customBtnText: { color: COLORS.textSecondary, fontSize: 14 },

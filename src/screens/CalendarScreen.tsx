@@ -8,6 +8,7 @@ import { useApp } from '../context/AppContext';
 import { subscribeUserEntries } from '../services/firestoreService';
 import { DayEntry, User, Workout, WorkoutEntry } from '../types';
 import { getDayNumber, formatDate, getTodayString } from '../utils/dateUtils';
+import { displayName } from '../utils/displayName';
 
 function getWorkouts(w: WorkoutEntry): Workout[] {
   if (w.workouts?.length) return w.workouts;
@@ -137,7 +138,7 @@ export default function CalendarScreen({ onEditDay }: Props) {
                   onPress={() => { setSelectedUser(u.id === currentUser?.id ? null : u); setSelectedDay(null); }}
                 >
                   <Text style={styles.userPillAvatar}>{u.avatar}</Text>
-                  <Text style={[styles.userPillName, viewUser?.id === u.id && styles.userPillNameActive]}>{u.name}</Text>
+                  <Text style={[styles.userPillName, viewUser?.id === u.id && styles.userPillNameActive]}>{displayName(u)}</Text>
                 </TouchableOpacity>
               ))}
             </View>

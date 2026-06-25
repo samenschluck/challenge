@@ -6,6 +6,8 @@ export interface User {
   height?: number;
   gender?: 'male' | 'female';
   age?: number;
+  title?: string;
+  sportXp?: Record<string, number>;
 }
 
 export interface Workout {

@@ -10,6 +10,7 @@ import UserDayCard from '../components/UserDayCard';
 import SettingsModal from '../components/SettingsModal';
 import { formatDate, getTodayString, getTodayDayNumber, getDaysRemaining, getProgressPercent } from '../utils/dateUtils';
 import { User } from '../types';
+import { displayName } from '../utils/displayName';
 
 interface Props {
   onGoCheckin: () => void;
@@ -78,7 +79,7 @@ export default function HomeScreen({ onGoCheckin }: Props) {
           {/* Header */}
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.greeting}>Hey {currentUser?.name} {currentUser?.avatar}</Text>
+              <Text style={styles.greeting}>Hey {displayName(currentUser)} {currentUser?.avatar}</Text>
               <Text style={styles.dateText}>{formatDate(today)}</Text>
             </View>
             <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.iconBtn}>

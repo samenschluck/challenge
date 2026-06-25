@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { User, DayEntry, Workout, WorkoutEntry } from '../types';
+import { displayName } from '../utils/displayName';
 
 function getWorkouts(w: WorkoutEntry): Workout[] {
   if (w.workouts?.length) return w.workouts;
@@ -39,7 +40,7 @@ export default function UserDayCard({ user, entry, isMe }: Props) {
           <Text style={styles.avatarText}>{user.avatar}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{user.name} {isMe ? '(du)' : ''}</Text>
+          <Text style={styles.name}>{displayName(user)} {isMe ? '(du)' : ''}</Text>
           <View style={styles.badges}>
             <View style={[styles.badge, hasWorkout ? styles.badgeGreen : styles.badgeGray]}>
               <Text style={styles.badgeText}>{hasWorkout ? '💪 Sport' : '— Sport'}</Text>
