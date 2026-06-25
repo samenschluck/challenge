@@ -54,6 +54,13 @@ export function subscribeUserEntries(userId: string, cb: (entries: DayEntry[]) =
   });
 }
 
+export function subscribeAllEntries(cb: (entries: DayEntry[]) => void) {
+  return onValue(ref(rtdb, 'entries'), snap => {
+    const val = snap.val();
+    cb(val ? (Object.values(val) as DayEntry[]) : []);
+  });
+}
+
 export async function getAllEntriesForUser(userId: string): Promise<DayEntry[]> {
   const q = query(ref(rtdb, 'entries'), orderByChild('userId'), equalTo(userId));
   const snap = await get(q);

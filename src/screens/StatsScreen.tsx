@@ -66,7 +66,7 @@ const xpBarStyles = StyleSheet.create({
 const RARITY_ORDER: Record<string, number> = { legendary: 0, epic: 1, rare: 2, common: 3 };
 
 export default function StatsScreen() {
-  const { currentUser, allUsers, myEntries, mySportXp, myAchievements } = useApp();
+  const { currentUser, allUsers, allEntries, myEntries, mySportXp, myAchievements } = useApp();
 
   const today = getTodayString();
   const daysElapsed = Math.max(1, Math.floor(
@@ -174,7 +174,7 @@ export default function StatsScreen() {
                 const topLevel = topSport ? getLevelFromXp(topSport[1]) : 0;
                 const titleDef = u.title ? getTitleByKey(u.title) : undefined;
                 const isMe = u.id === currentUser?.id;
-                const streak = isMe ? myStreak : (u.streak ?? 0);
+                const streak = isMe ? myStreak : getStreakForUser(allEntries, u.id);
                 return (
                   <View key={u.id} style={[styles.leaderRow, i === 0 && styles.leaderFirst]}>
                     <Text style={styles.leaderRank}>{RANK_ICONS[i] ?? `${i + 1}.`}</Text>

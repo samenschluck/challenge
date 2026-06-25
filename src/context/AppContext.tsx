@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { User, DayEntry } from '../types';
 import { loadUser, saveUser, clearUser } from '../utils/storage';
-import { upsertUser, getUser, subscribeUsers, subscribeAllEntriesForDate, subscribeUserEntries } from '../services/firestoreService';
+import { upsertUser, getUser, subscribeUsers, subscribeAllEntriesForDate, subscribeUserEntries, subscribeAllEntries } from '../services/firestoreService';
 import { getTodayString } from '../utils/dateUtils';
 import { computeSportXp } from '../constants/titles';
 import { calcStreak } from '../utils/dateUtils';
@@ -11,6 +11,7 @@ import AchievementToast from '../components/AchievementToast';
 interface AppContextType {
   currentUser: User | null;
   allUsers: User[];
+  allEntries: DayEntry[];
   todayEntries: DayEntry[];
   myEntries: DayEntry[];
   todayMyEntry: DayEntry | null;
@@ -28,6 +29,7 @@ const AppContext = createContext<AppContextType>({} as AppContextType);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [allEntries, setAllEntries] = useState<DayEntry[]>([]);
   const [todayEntries, setTodayEntries] = useState<DayEntry[]>([]);
   const [myEntries, setMyEntries] = useState<DayEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsub = subscribeUsers(setAllUsers);
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeAllEntries(setAllEntries);
     return unsub;
   }, []);
 
@@ -147,10 +154,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      currentUser, allUsers, todayEntries, myEntries, todayMyEntry,
+      currentUser, allUsers, allEntries, todayEntries, myEntries, todayMyEntry,
       mySportXp, myAchievements, setCurrentUser, updateUserSettings, updateTitle, logout, loading,
     }}>
-      {children}
+        {children}
       {toastQueue[0] && (
         <AchievementToast
           key={toastQueue[0].key}
