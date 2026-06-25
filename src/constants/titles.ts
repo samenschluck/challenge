@@ -82,27 +82,6 @@ export const SPORT_TITLES: Record<string, TitleDef[]> = {
     { key: 'delphin', label: 'Delphin', sport: 'Schwimmen', levelRequired: 20, emoji: '🐬' },
     { key: 'meeresbezwinger', label: 'Meeresbezwinger', sport: 'Schwimmen', levelRequired: 25, emoji: '🌊' },
   ],
-  'Fußball': [
-    { key: 'ballstolperer', label: 'Ballstolperer', sport: 'Fußball', levelRequired: 5, emoji: '😅' },
-    { key: 'gratscher', label: 'Grätscher', sport: 'Fußball', levelRequired: 10, emoji: '⚽' },
-    { key: 'feldspieler', label: 'Feldspieler', sport: 'Fußball', levelRequired: 15, emoji: '🏟️' },
-    { key: 'torjager', label: 'Torjäger', sport: 'Fußball', levelRequired: 20, emoji: '🎯' },
-    { key: 'spielmacher', label: 'Spielmacher', sport: 'Fußball', levelRequired: 25, emoji: '👑' },
-  ],
-  'Basketball': [
-    { key: 'korbwerfer', label: 'Korbwerfer', sport: 'Basketball', levelRequired: 5, emoji: '🏀' },
-    { key: 'freiwurftreffer', label: 'Freiwurftreffer', sport: 'Basketball', levelRequired: 10, emoji: '🎯' },
-    { key: 'passer', label: 'Passer', sport: 'Basketball', levelRequired: 15, emoji: '✋' },
-    { key: 'dribbelkunstler', label: 'Dribbelkünstler', sport: 'Basketball', levelRequired: 20, emoji: '💫' },
-    { key: 'dunkelkonig', label: 'Dunkelkönig', sport: 'Basketball', levelRequired: 25, emoji: '🤴' },
-  ],
-  'Yoga': [
-    { key: 'streckhuhn', label: 'Streckhuhn', sport: 'Yoga', levelRequired: 5, emoji: '🐔' },
-    { key: 'gleichgewichtsucher', label: 'Gleichgewichtsucher', sport: 'Yoga', levelRequired: 10, emoji: '🧘' },
-    { key: 'asanameister', label: 'Asanameister', sport: 'Yoga', levelRequired: 15, emoji: '🌸' },
-    { key: 'chakraoffner', label: 'Chakraöffner', sport: 'Yoga', levelRequired: 20, emoji: '✨' },
-    { key: 'erleuchteter', label: 'Erleuchteter', sport: 'Yoga', levelRequired: 25, emoji: '☀️' },
-  ],
   'Sonstiges': [
     { key: 'bewegungsmensch', label: 'Bewegungsmensch', sport: 'Sonstiges', levelRequired: 5, emoji: '🤸' },
     { key: 'aktivist', label: 'Aktivist', sport: 'Sonstiges', levelRequired: 10, emoji: '💪' },

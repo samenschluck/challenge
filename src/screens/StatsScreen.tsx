@@ -14,7 +14,7 @@ import {
 const SPORT_EMOJIS: Record<string, string> = {
   'Krafttraining': '🏋️', 'Cardio': '❤️', 'HIIT': '⚡',
   'Laufen': '🏃', 'Radfahren': '🚴', 'Schwimmen': '🏊',
-  'Fußball': '⚽', 'Basketball': '🏀', 'Yoga': '🧘', 'Sonstiges': '🤸',
+  'Sonstiges': '🤸',
 };
 
 function calcStreak(entries: DayEntry[], userId: string): number {
