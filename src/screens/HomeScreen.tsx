@@ -11,6 +11,7 @@ import SettingsModal from '../components/SettingsModal';
 import { formatDate, getTodayString, getTodayDayNumber, getDaysRemaining, getProgressPercent } from '../utils/dateUtils';
 import { User } from '../types';
 import { displayName } from '../utils/displayName';
+import { VERSION } from '../constants/version';
 
 interface Props {
   onGoCheckin: () => void;
@@ -225,6 +226,8 @@ export default function HomeScreen({ onGoCheckin }: Props) {
           {currentUser && !allUsers.find(u => u.id === currentUser.id) && (
             <UserDayCard user={currentUser} entry={myEntry} isMe />
           )}
+
+          <Text style={styles.versionText}>v{VERSION}</Text>
         </ScrollView>
       </SafeAreaView>
 
@@ -320,4 +323,5 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 12 },
   emptyHint: { color: COLORS.textMuted, textAlign: 'center', fontSize: 14, marginTop: 20 },
+  versionText: { textAlign: 'center', fontSize: 11, color: COLORS.textMuted, marginTop: 16, opacity: 0.5 },
 });

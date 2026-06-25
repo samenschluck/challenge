@@ -10,6 +10,7 @@ import { useApp } from '../context/AppContext';
 import { getTodayDayNumber } from '../utils/dateUtils';
 import { displayName } from '../utils/displayName';
 import { getTitleByKey } from '../constants/titles';
+import { VERSION } from '../constants/version';
 
 const PRESET_USERS = [
   { name: 'FelsenFlade', avatar: AVATARS[0], avatarColor: AVATAR_COLORS[0] },
@@ -43,6 +44,7 @@ export default function LoginScreen() {
               <Text style={styles.title}>100 Tage{'\n'}Challenge</Text>
               <Text style={styles.subtitle}>Tag {Math.max(1, dayNum)} von 100</Text>
               <Text style={styles.dates}>23. Juni – 30. September 2026</Text>
+              <Text style={styles.version}>v{VERSION}</Text>
             </View>
 
             <Text style={styles.sectionLabel}>Wer bist du?</Text>
@@ -107,6 +109,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 36, fontWeight: '800', color: COLORS.text, textAlign: 'center', lineHeight: 42 },
   subtitle: { fontSize: 18, color: COLORS.primary, fontWeight: '700', marginTop: 8 },
   dates: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
+  version: { fontSize: 11, color: COLORS.textMuted, marginTop: 6 },
   sectionLabel: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 12, letterSpacing: 1 },
   userCard: {
     backgroundColor: COLORS.card,

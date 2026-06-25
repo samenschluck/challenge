@@ -22,6 +22,7 @@ function getDayStatus(entries: DayEntry[], userId: string, date: string): 'full'
   if (date < CHALLENGE_START || date > CHALLENGE_END) return 'future';
   const entry = entries.find(e => e.userId === userId && e.date === date);
   if (entry?.workout) return 'full';
+  if (date === today) return 'future'; // Today is still open — not a miss yet
   return 'none';
 }
 
@@ -100,10 +101,13 @@ export default function CalendarScreen({ onEditDay }: Props) {
     return relevantEntries.find(e => e.userId === viewUser?.id && e.date === date) ?? null;
   }
 
-  const totalDays = allDays.filter(d => d <= today && d >= CHALLENGE_START).length;
-  const fullDays = allDays.filter(d =>
-    getDayStatus(relevantEntries, viewUser?.id ?? '', d) === 'full'
-  ).length;
+  // Only count past days (< today) for "Verpasst" and quote — today is still open
+  const pastDays = allDays.filter(d => d < today && d >= CHALLENGE_START);
+  const totalDays = pastDays.length;
+  const fullPast = pastDays.filter(d => getDayStatus(relevantEntries, viewUser?.id ?? '', d) === 'full').length;
+  const trainedToday = getDayStatus(relevantEntries, viewUser?.id ?? '', today) === 'full';
+  const fullDays = fullPast + (trainedToday ? 1 : 0);
+  const missedDays = totalDays - fullPast;
 
   const streak = useMemo(() => {
     let s = 0;
@@ -111,10 +115,16 @@ export default function CalendarScreen({ onEditDay }: Props) {
     while (true) {
       const d = cur.toISOString().split('T')[0];
       if (d < CHALLENGE_START) break;
-      if (getDayStatus(relevantEntries, viewUser?.id ?? '', d) === 'full') {
+      const status = getDayStatus(relevantEntries, viewUser?.id ?? '', d);
+      if (status === 'full') {
         s++;
         cur.setDate(cur.getDate() - 1);
-      } else break;
+      } else if (d === today) {
+        // Today not trained yet — skip it, don't break streak
+        cur.setDate(cur.getDate() - 1);
+      } else {
+        break;
+      }
     }
     return s;
   }, [relevantEntries, viewUser]);
@@ -155,11 +165,11 @@ export default function CalendarScreen({ onEditDay }: Props) {
               <Text style={styles.statLabel}>✅ Trainiert</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNum}>{totalDays - fullDays}</Text>
+              <Text style={styles.statNum}>{missedDays}</Text>
               <Text style={styles.statLabel}>❌ Verpasst</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNum}>{totalDays > 0 ? Math.round((fullDays / totalDays) * 100) : 0}%</Text>
+              <Text style={styles.statNum}>{totalDays > 0 ? Math.round((fullPast / totalDays) * 100) : 0}%</Text>
               <Text style={styles.statLabel}>📊 Quote</Text>
             </View>
           </View>

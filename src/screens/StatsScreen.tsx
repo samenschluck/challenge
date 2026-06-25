@@ -25,8 +25,14 @@ function calcStreak(entries: DayEntry[], userId: string): number {
     const d = cur.toISOString().split('T')[0];
     if (d < CHALLENGE_START) break;
     const e = entries.find(x => x.userId === userId && x.date === d);
-    if (e?.workout) { streak++; cur.setDate(cur.getDate() - 1); }
-    else break;
+    if (e?.workout) {
+      streak++;
+      cur.setDate(cur.getDate() - 1);
+    } else if (d === today) {
+      cur.setDate(cur.getDate() - 1); // Today still open — skip, don't break
+    } else {
+      break;
+    }
   }
   return streak;
 }
