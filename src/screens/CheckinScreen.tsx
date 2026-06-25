@@ -1,22 +1,17 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, SafeAreaView,
-  TouchableOpacity, TextInput, Switch, KeyboardAvoidingView, Platform,
+  TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { saveDayEntry } from '../services/firestoreService';
 import { getTodayString, formatDate } from '../utils/dateUtils';
-import { DayEntry, WorkoutEntry, NutritionEntry, Meal } from '../types';
+import { DayEntry, Workout, WorkoutEntry, NutritionEntry, Meal } from '../types';
 import AddMealModal from '../components/AddMealModal';
+import AddWorkoutModal from '../components/AddWorkoutModal';
 
-const WORKOUT_TYPES = ['Krafttraining', 'Cardio', 'HIIT', 'Laufen', 'Radfahren', 'Schwimmen', 'Fußball', 'Basketball', 'Yoga', 'Sonstiges'];
-const INTENSITIES = [
-  { key: 'leicht', label: 'Leicht 😌', color: COLORS.success },
-  { key: 'mittel', label: 'Mittel 💪', color: COLORS.warning },
-  { key: 'intensiv', label: 'Intensiv 🔥', color: COLORS.danger },
-] as const;
 const MOODS = ['😴', '😐', '🙂', '😊', '🔥'];
 
 interface Props {
@@ -42,12 +37,17 @@ export default function CheckinScreen({ onDone, date }: Props) {
     ? (myEntries.find(e => e.date === targetDate) ?? null)
     : todayMyEntry;
 
-  // Sport
-  const [hasWorkout, setHasWorkout] = useState(!!targetEntry?.workout);
-  const [workoutType, setWorkoutType] = useState(targetEntry?.workout?.type ?? 'Krafttraining');
-  const [workoutDuration, setWorkoutDuration] = useState(String(targetEntry?.workout?.duration ?? '60'));
-  const [intensity, setIntensity] = useState<'leicht' | 'mittel' | 'intensiv'>(targetEntry?.workout?.intensity ?? 'mittel');
-  const [workoutNotes, setWorkoutNotes] = useState(targetEntry?.workout?.notes ?? '');
+  // Workouts
+  const [workouts, setWorkouts] = useState<Workout[]>(() => {
+    const w = targetEntry?.workout;
+    if (!w) return [];
+    if (w.workouts?.length) return w.workouts;
+    // Migrate legacy single-workout format
+    if (w.type) return [{ id: 'legacy', type: w.type, duration: w.duration ?? 0, intensity: w.intensity ?? 'mittel', notes: w.notes }];
+    return [];
+  });
+  const [showAddWorkout, setShowAddWorkout] = useState(false);
+  const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
 
   // Meals & water
   const [meals, setMeals] = useState<Meal[]>(targetEntry?.nutrition?.meals ?? []);
@@ -55,6 +55,19 @@ export default function CheckinScreen({ onDone, date }: Props) {
 
   // Weight
   const [weight, setWeight] = useState(targetEntry?.weight ? String(targetEntry.weight) : '');
+
+  // Workout handlers
+  function handleWorkoutAdded(workout: Workout) {
+    if (editingWorkout) {
+      setWorkouts(prev => prev.map(w => w.id === editingWorkout.id ? workout : w));
+    } else {
+      setWorkouts(prev => [...prev, workout]);
+    }
+    setEditingWorkout(null);
+  }
+  function removeWorkout(id: string) { setWorkouts(prev => prev.filter(w => w.id !== id)); }
+  function openEditWorkout(w: Workout) { setEditingWorkout(w); setShowAddWorkout(true); }
+  function openAddWorkout() { setEditingWorkout(null); setShowAddWorkout(true); }
 
   // Meal modal state
   const [showAddMeal, setShowAddMeal] = useState(false);
@@ -104,20 +117,15 @@ export default function CheckinScreen({ onDone, date }: Props) {
       setSaveError('Kein User eingeloggt – bitte neu einloggen.');
       return;
     }
-    if (!hasWorkout && meals.length === 0 && !water && !weight) {
-      setSaveError('Bitte mindestens Sport aktivieren, eine Mahlzeit hinzufügen oder Gewicht eintragen.');
+    if (workouts.length === 0 && meals.length === 0 && !water && !weight) {
+      setSaveError('Bitte mindestens ein Training hinzufügen, eine Mahlzeit eintragen oder Gewicht eintragen.');
       return;
     }
 
     setSaving(true);
     setSaveStatus('saving');
     try {
-      const workout: WorkoutEntry | null = hasWorkout ? {
-        type: workoutType,
-        duration: Number(workoutDuration) || 0,
-        intensity,
-        ...(workoutNotes ? { notes: workoutNotes } : {}),
-      } : null;
+      const workout: WorkoutEntry | null = workouts.length > 0 ? { workouts } : null;
 
       const hasNutrition = meals.length > 0 || !!water;
       const nutrition: NutritionEntry | null = hasNutrition ? {
@@ -178,67 +186,33 @@ export default function CheckinScreen({ onDone, date }: Props) {
 
             {/* ── SPORT ── */}
             <View style={styles.card}>
-              <View style={styles.toggleRow}>
-                <SectionHeader icon="💪" title="Sport heute?" />
-                <Switch
-                  value={hasWorkout}
-                  onValueChange={setHasWorkout}
-                  trackColor={{ true: COLORS.success, false: COLORS.border }}
-                  thumbColor={hasWorkout ? '#fff' : COLORS.textSecondary}
-                />
-              </View>
+              <SectionHeader icon="💪" title="Training" />
 
-              {hasWorkout && (
-                <>
-                  <Text style={styles.fieldLabel}>Art der Einheit</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      {WORKOUT_TYPES.map(t => (
-                        <TouchableOpacity
-                          key={t}
-                          style={[styles.pill, workoutType === t && styles.pillActive]}
-                          onPress={() => setWorkoutType(t)}
-                        >
-                          <Text style={[styles.pillText, workoutType === t && styles.pillTextActive]}>{t}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-
-                  <Text style={styles.fieldLabel}>Dauer (Minuten)</Text>
-                  <TextInput
-                    style={styles.singleInput}
-                    value={workoutDuration}
-                    onChangeText={setWorkoutDuration}
-                    keyboardType="numeric"
-                    placeholder="60"
-                    placeholderTextColor={COLORS.textMuted}
-                  />
-
-                  <Text style={styles.fieldLabel}>Intensität</Text>
-                  <View style={styles.intensityRow}>
-                    {INTENSITIES.map(i => (
-                      <TouchableOpacity
-                        key={i.key}
-                        style={[styles.intensityBtn, intensity === i.key && { backgroundColor: i.color + '33', borderColor: i.color }]}
-                        onPress={() => setIntensity(i.key)}
-                      >
-                        <Text style={[styles.intensityText, intensity === i.key && { color: i.color }]}>{i.label}</Text>
+              {workouts.length > 0 && (
+                <View style={styles.mealsList}>
+                  {workouts.map((w, i) => (
+                    <TouchableOpacity key={w.id} style={styles.mealChip} onPress={() => openEditWorkout(w)} activeOpacity={0.7}>
+                      <View style={styles.mealChipNum}>
+                        <Text style={styles.mealChipNumText}>{i + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.mealChipName}>{w.type}</Text>
+                        <Text style={styles.mealChipMacros}>{w.duration} Min · {w.intensity}{w.notes ? ` · ${w.notes}` : ''}</Text>
+                      </View>
+                      <View style={styles.mealEditHint}>
+                        <Text style={styles.mealEditIcon}>✏️</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => removeWorkout(w.id)} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                        <Text style={styles.mealRemove}>✕</Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <Text style={styles.fieldLabel}>Notizen (optional)</Text>
-                  <TextInput
-                    style={[styles.singleInput, { minHeight: 60 }]}
-                    value={workoutNotes}
-                    onChangeText={setWorkoutNotes}
-                    placeholder="z.B. neues PR, Muskelkater..."
-                    placeholderTextColor={COLORS.textMuted}
-                    multiline
-                  />
-                </>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               )}
+
+              <TouchableOpacity style={styles.addMealBtn} onPress={openAddWorkout}>
+                <Text style={styles.addMealBtnText}>+ Training hinzufügen</Text>
+              </TouchableOpacity>
             </View>
 
             {/* ── MAHLZEITEN ── */}
@@ -365,6 +339,13 @@ export default function CheckinScreen({ onDone, date }: Props) {
           </ScrollView>
         </KeyboardAvoidingView>
 
+        {showAddWorkout && (
+          <AddWorkoutModal
+            editWorkout={editingWorkout ?? undefined}
+            onWorkoutAdded={handleWorkoutAdded}
+            onClose={() => { setShowAddWorkout(false); setEditingWorkout(null); }}
+          />
+        )}
         {showAddMeal && (
           <AddMealModal
             editMeal={editingMeal ?? undefined}
@@ -382,11 +363,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
   subtitle: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 20 },
   card: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   sectionIcon: { fontSize: 22, marginRight: 10 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   fieldLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4 },
+  singleInput: {
+    backgroundColor: COLORS.cardLight, borderRadius: 10, padding: 12,
+    color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12,
+  },
 
   // Weight
   weightRow: {
@@ -402,19 +386,6 @@ const styles = StyleSheet.create({
   },
   weightInput: { flex: 1, color: COLORS.text, fontSize: 26, fontWeight: '800' },
   weightUnit: { color: COLORS.textSecondary, fontSize: 16 },
-
-  // Workout
-  pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardLight },
-  pillActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '33' },
-  pillText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
-  pillTextActive: { color: COLORS.primaryLight },
-  singleInput: {
-    backgroundColor: COLORS.cardLight, borderRadius: 10, padding: 12,
-    color: COLORS.text, fontSize: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 12,
-  },
-  intensityRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  intensityBtn: { flex: 1, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
-  intensityText: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
 
   // Meals
   mealsList: { marginBottom: 10 },

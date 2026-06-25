@@ -1,7 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/theme';
-import { User, DayEntry } from '../types';
+import { User, DayEntry, Workout, WorkoutEntry } from '../types';
+
+function getWorkouts(w: WorkoutEntry): Workout[] {
+  if (w.workouts?.length) return w.workouts;
+  if (w.type) return [{ id: 'legacy', type: w.type, duration: w.duration ?? 0, intensity: w.intensity ?? 'mittel', notes: w.notes }];
+  return [];
+}
 
 interface Props {
   user: User;
@@ -55,14 +61,12 @@ export default function UserDayCard({ user, entry, isMe }: Props) {
         </View>
       </View>
 
-      {hasWorkout && (
-        <View style={styles.workoutRow}>
+      {hasWorkout && getWorkouts(entry!.workout!).map((w, i) => (
+        <View key={i} style={styles.workoutRow}>
           <Text style={styles.workoutIcon}>🏋️</Text>
-          <Text style={styles.workoutText}>
-            {entry!.workout!.type} · {entry!.workout!.duration} Min · {entry!.workout!.intensity}
-          </Text>
+          <Text style={styles.workoutText}>{w.type} · {w.duration} Min · {w.intensity}</Text>
         </View>
-      )}
+      ))}
 
       {hasNutrition && (
         <View style={styles.nutritionSection}>

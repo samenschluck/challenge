@@ -6,8 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, CHALLENGE_START, CHALLENGE_END } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { subscribeUserEntries } from '../services/firestoreService';
-import { DayEntry, User } from '../types';
+import { DayEntry, User, Workout, WorkoutEntry } from '../types';
 import { getDayNumber, formatDate, getTodayString } from '../utils/dateUtils';
+
+function getWorkouts(w: WorkoutEntry): Workout[] {
+  if (w.workouts?.length) return w.workouts;
+  if (w.type) return [{ id: 'legacy', type: w.type, duration: w.duration ?? 0, intensity: w.intensity ?? 'mittel', notes: w.notes }];
+  return [];
+}
 
 function getDayStatus(entries: DayEntry[], userId: string, date: string): 'full' | 'none' | 'future' {
   const today = getTodayString();
@@ -76,7 +82,6 @@ export default function CalendarScreen({ onEditDay }: Props) {
 
   const viewUser = selectedUser ?? currentUser;
   const today = getTodayString();
-  const yesterdayStr = getLocalDateString(-1);
 
   // Subscribe to the viewed user's full entry history when it's not the current user
   useEffect(() => {
@@ -114,7 +119,7 @@ export default function CalendarScreen({ onEditDay }: Props) {
   }, [relevantEntries, viewUser]);
 
   const dayEntry = selectedDay ? getEntry(selectedDay) : null;
-  const canEditSelected = selectedDay === yesterdayStr && viewUser?.id === currentUser?.id && !!onEditDay;
+  const canEditSelected = !!selectedDay && selectedDay <= today && selectedDay >= CHALLENGE_START && viewUser?.id === currentUser?.id && !!onEditDay;
 
   return (
     <LinearGradient colors={['#0f0f1a', '#0f0f1a']} style={{ flex: 1 }}>
@@ -220,12 +225,12 @@ export default function CalendarScreen({ onEditDay }: Props) {
 
               {dayEntry ? (
                 <>
-                  {dayEntry.workout && (
-                    <View style={styles.detailRow}>
+                  {dayEntry.workout && getWorkouts(dayEntry.workout).map((w, i) => (
+                    <View key={i} style={styles.detailRow}>
                       <Text style={styles.detailIcon}>💪</Text>
-                      <Text style={styles.detailText}>{dayEntry.workout.type} · {dayEntry.workout.duration} Min · {dayEntry.workout.intensity}</Text>
+                      <Text style={styles.detailText}>{w.type} · {w.duration} Min · {w.intensity}{w.notes ? ` · ${w.notes}` : ''}</Text>
                     </View>
-                  )}
+                  ))}
                   {dayEntry.nutrition && (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailIcon}>🥗</Text>
@@ -261,7 +266,7 @@ export default function CalendarScreen({ onEditDay }: Props) {
 
               {canEditSelected && !dayEntry && (
                 <TouchableOpacity style={[styles.editBtn, { marginTop: 10, alignSelf: 'center' }]} onPress={() => onEditDay!(selectedDay)}>
-                  <Text style={styles.editBtnText}>✏️ Gestern nachtragen</Text>
+                  <Text style={styles.editBtnText}>✏️ Eintrag nachtragen</Text>
                 </TouchableOpacity>
               )}
             </View>

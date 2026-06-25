@@ -8,10 +8,20 @@ export interface User {
   age?: number;
 }
 
-export interface WorkoutEntry {
+export interface Workout {
+  id: string;
   type: string;
   duration: number;
   intensity: 'leicht' | 'mittel' | 'intensiv';
+  notes?: string;
+}
+
+export interface WorkoutEntry {
+  workouts: Workout[];
+  // Legacy fields kept for backward compat with old saved data
+  type?: string;
+  duration?: number;
+  intensity?: 'leicht' | 'mittel' | 'intensiv';
   notes?: string;
 }
 
