@@ -5,14 +5,16 @@ import HomeScreen from '../screens/HomeScreen';
 import CheckinScreen from '../screens/CheckinScreen';
 import CalendarScreen from '../screens/CalendarScreen';
 import StatsScreen from '../screens/StatsScreen';
+import ChatScreen from '../screens/ChatScreen';
 
-type Tab = 'home' | 'checkin' | 'calendar' | 'stats';
+type Tab = 'home' | 'checkin' | 'calendar' | 'stats' | 'chat';
 
 const TABS = [
   { key: 'home', icon: '🏠', label: 'Home' },
   { key: 'checkin', icon: '⚡', label: 'Check-in' },
   { key: 'calendar', icon: '📅', label: 'Kalender' },
   { key: 'stats', icon: '📊', label: 'Stats' },
+  { key: 'chat', icon: '💬', label: 'Chat' },
 ] as const;
 
 export default function TabNavigator() {
@@ -36,6 +38,7 @@ export default function TabNavigator() {
         {activeTab === 'checkin' && <CheckinScreen date={checkinDate} onDone={() => { setCheckinDate(undefined); setActiveTab('home'); }} />}
         {activeTab === 'calendar' && <CalendarScreen onEditDay={(date) => goCheckin(date)} />}
         {activeTab === 'stats' && <StatsScreen />}
+        {activeTab === 'chat' && <ChatScreen />}
       </View>
 
       <View style={styles.tabBar}>
@@ -65,11 +68,11 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
     paddingBottom: 20,
     paddingTop: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 4,
   },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  tabIcon: { fontSize: 22 },
-  tabLabel: { fontSize: 10, color: COLORS.textMuted, marginTop: 2, fontWeight: '600' },
+  tabIcon: { fontSize: 20 },
+  tabLabel: { fontSize: 9, color: COLORS.textMuted, marginTop: 2, fontWeight: '600' },
   tabLabelActive: { color: COLORS.primaryLight },
   tabIndicator: { width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.primary, marginTop: 3 },
 });

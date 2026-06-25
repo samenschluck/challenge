@@ -58,4 +58,14 @@ export interface DayEntry {
   completedAt: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  userAvatarColor: string;
+  text: string;
+  timestamp: number;
+}
+
 export type Screen = 'login' | 'home' | 'checkin' | 'calendar' | 'stats' | 'nutrition';

@@ -11,6 +11,7 @@ import { getTodayDayNumber } from '../utils/dateUtils';
 import { displayName } from '../utils/displayName';
 import { getTitleByKey } from '../constants/titles';
 import { VERSION } from '../constants/version';
+import PatchNotesModal from '../components/PatchNotesModal';
 
 const PRESET_USERS = [
   { name: 'FelsenFlade', avatar: AVATARS[0], avatarColor: AVATAR_COLORS[0] },
@@ -22,6 +23,7 @@ export default function LoginScreen() {
   const { setCurrentUser, allUsers } = useApp();
   const [customName, setCustomName] = useState('');
   const [showCustom, setShowCustom] = useState(false);
+  const [showPatchNotes, setShowPatchNotes] = useState(false);
   const dayNum = getTodayDayNumber();
 
   async function pickUser(name: string, avatar: string, color: string) {
@@ -44,7 +46,9 @@ export default function LoginScreen() {
               <Text style={styles.title}>100 Tage{'\n'}Challenge</Text>
               <Text style={styles.subtitle}>Tag {Math.max(1, dayNum)} von 100</Text>
               <Text style={styles.dates}>23. Juni – 30. September 2026</Text>
-              <Text style={styles.version}>v{VERSION}</Text>
+              <TouchableOpacity onPress={() => setShowPatchNotes(true)} style={styles.versionBtn}>
+                <Text style={styles.versionBtnText}>v{VERSION} · Patchnotes 📋</Text>
+              </TouchableOpacity>
             </View>
 
             <Text style={styles.sectionLabel}>Wer bist du?</Text>
@@ -98,6 +102,8 @@ export default function LoginScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {showPatchNotes && <PatchNotesModal onClose={() => setShowPatchNotes(false)} />}
     </LinearGradient>
   );
 }
@@ -109,7 +115,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 36, fontWeight: '800', color: COLORS.text, textAlign: 'center', lineHeight: 42 },
   subtitle: { fontSize: 18, color: COLORS.primary, fontWeight: '700', marginTop: 8 },
   dates: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
-  version: { fontSize: 11, color: COLORS.textMuted, marginTop: 6 },
+  versionBtn: { marginTop: 8, paddingVertical: 4, paddingHorizontal: 10 },
+  versionBtnText: { fontSize: 12, color: COLORS.textMuted },
   sectionLabel: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '600', marginBottom: 12, letterSpacing: 1 },
   userCard: {
     backgroundColor: COLORS.card,

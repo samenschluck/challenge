@@ -1,6 +1,6 @@
-import { ref, set, get, onValue, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, set, get, push, onValue, query, orderByChild, equalTo, limitToLast } from 'firebase/database';
 import { rtdb } from '../config/firebase';
-import { DayEntry, User } from '../types';
+import { ChatMessage, DayEntry, User } from '../types';
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
@@ -59,4 +59,21 @@ export async function getAllEntriesForUser(userId: string): Promise<DayEntry[]> 
   const snap = await get(q);
   if (!snap.exists()) return [];
   return Object.values(snap.val()) as DayEntry[];
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+export async function sendChatMessage(msg: Omit<ChatMessage, 'id'>): Promise<void> {
+  const newRef = push(ref(rtdb, 'chat'));
+  await set(newRef, { ...msg, id: newRef.key });
+}
+
+export function subscribeChatMessages(cb: (messages: ChatMessage[]) => void, limit = 100) {
+  const q = query(ref(rtdb, 'chat'), orderByChild('timestamp'), limitToLast(limit));
+  return onValue(q, snap => {
+    const val = snap.val();
+    if (!val) { cb([]); return; }
+    const msgs = (Object.values(val) as ChatMessage[]).sort((a, b) => a.timestamp - b.timestamp);
+    cb(msgs);
+  });
 }
