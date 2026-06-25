@@ -39,6 +39,35 @@ export function getXpProgress(xp: number) {
   };
 }
 
+// ── XP Multipliers ────────────────────────────────────────────────────────────
+// Harder sports give more XP per minute to balance effort fairly.
+// Krafttraining is baseline 1.0 (lots of rest between sets).
+export const SPORT_XP_MULTIPLIERS: Record<string, number> = {
+  'HIIT': 1.8,
+  'Vikings Training': 1.5,
+  'Kampfsport': 1.4,
+  'Laufen': 1.4,
+  'Schwimmen': 1.3,
+  'Cardio': 1.2,
+  'Radfahren': 1.1,
+  'Krafttraining': 1.0,
+  'Sonstiges': 1.0,
+};
+
+export const INTENSITY_XP_MULTIPLIERS: Record<string, number> = {
+  leicht: 0.75,
+  mittel: 1.0,
+  intensiv: 1.3,
+};
+
+export function calcWorkoutXp(duration: number, sport: string, intensity?: string): number {
+  const sportMult = SPORT_XP_MULTIPLIERS[sport] ?? 1.0;
+  const intMult = INTENSITY_XP_MULTIPLIERS[intensity ?? 'mittel'] ?? 1.0;
+  return Math.round(duration * sportMult * intMult);
+}
+
+// ── Titles ────────────────────────────────────────────────────────────────────
+
 export const SPORT_TITLES: Record<string, TitleDef[]> = {
   'Krafttraining': [
     { key: 'hantelschuettler', label: 'Hantelschüttler', sport: 'Krafttraining', levelRequired: 5, emoji: '🏋️' },
@@ -81,6 +110,20 @@ export const SPORT_TITLES: Record<string, TitleDef[]> = {
     { key: 'schwimmer', label: 'Schwimmer', sport: 'Schwimmen', levelRequired: 15, emoji: '🏊' },
     { key: 'delphin', label: 'Delphin', sport: 'Schwimmen', levelRequired: 20, emoji: '🐬' },
     { key: 'meeresbezwinger', label: 'Meeresbezwinger', sport: 'Schwimmen', levelRequired: 25, emoji: '🌊' },
+  ],
+  'Kampfsport': [
+    { key: 'weissgurt', label: 'Weißgurt', sport: 'Kampfsport', levelRequired: 5, emoji: '🥋' },
+    { key: 'blaugurt', label: 'Blaugurt', sport: 'Kampfsport', levelRequired: 10, emoji: '🥊' },
+    { key: 'kampfer', label: 'Kämpfer', sport: 'Kampfsport', levelRequired: 15, emoji: '⚔️' },
+    { key: 'krieger', label: 'Krieger', sport: 'Kampfsport', levelRequired: 20, emoji: '🛡️' },
+    { key: 'sensei', label: 'Sensei', sport: 'Kampfsport', levelRequired: 25, emoji: '👺' },
+  ],
+  'Vikings Training': [
+    { key: 'wikingerkind', label: 'Wikingerkind', sport: 'Vikings Training', levelRequired: 5, emoji: '🪓' },
+    { key: 'schildtraeger', label: 'Schildträger', sport: 'Vikings Training', levelRequired: 10, emoji: '🛡️' },
+    { key: 'berserker', label: 'Berserker', sport: 'Vikings Training', levelRequired: 15, emoji: '🔥' },
+    { key: 'jarls_krieger', label: 'Jarls Krieger', sport: 'Vikings Training', levelRequired: 20, emoji: '⚔️' },
+    { key: 'nordmann', label: 'Nordmann', sport: 'Vikings Training', levelRequired: 25, emoji: '🏔️' },
   ],
   'Sonstiges': [
     { key: 'bewegungsmensch', label: 'Bewegungsmensch', sport: 'Sonstiges', levelRequired: 5, emoji: '🤸' },
@@ -125,11 +168,11 @@ export function computeSportXp(entries: DayEntry[]): Record<string, number> {
     const ws = entry.workout.workouts ?? [];
     if (!ws.length && entry.workout.type) {
       const t = entry.workout.type;
-      xp[t] = (xp[t] ?? 0) + (entry.workout.duration ?? 0);
+      xp[t] = (xp[t] ?? 0) + calcWorkoutXp(entry.workout.duration ?? 0, t, entry.workout.intensity);
       continue;
     }
     for (const w of ws) {
-      xp[w.type] = (xp[w.type] ?? 0) + w.duration;
+      xp[w.type] = (xp[w.type] ?? 0) + calcWorkoutXp(w.duration, w.type, w.intensity);
     }
   }
   return xp;

@@ -6,7 +6,7 @@ import {
 import { COLORS } from '../constants/theme';
 import { Workout } from '../types';
 
-const WORKOUT_TYPES = ['Krafttraining', 'Cardio', 'HIIT', 'Laufen', 'Radfahren', 'Schwimmen', 'Sonstiges'];
+const WORKOUT_TYPES = ['Krafttraining', 'Cardio', 'HIIT', 'Laufen', 'Radfahren', 'Schwimmen', 'Kampfsport', 'Vikings Training', 'Sonstiges'];
 const INTENSITIES = [
   { key: 'leicht', label: 'Leicht 😌', color: COLORS.success },
   { key: 'mittel', label: 'Mittel 💪', color: COLORS.warning },
