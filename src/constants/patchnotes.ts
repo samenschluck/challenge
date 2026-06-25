@@ -6,6 +6,17 @@ export interface PatchNote {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: '1.4.0',
+    date: '25.06.2026',
+    changes: [
+      '32 Achievements in 4 Seltenheitsstufen (Gewöhnlich / Selten / Episch / Legendär) 🏅',
+      'Toast-Benachrichtigung beim Freischalten eines neuen Achievements',
+      'Achievements-Übersicht in den Statistiken',
+      'Chat: Long-Press auf eine Nachricht öffnet Reaktions-Picker 👍❤️😂💪🔥😮',
+      'Chat: Reaktionen werden live unter den Nachrichten angezeigt und sind antippbar',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '25.06.2026',
     changes: [

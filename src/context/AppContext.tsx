@@ -4,6 +4,8 @@ import { loadUser, saveUser, clearUser } from '../utils/storage';
 import { upsertUser, getUser, subscribeUsers, subscribeAllEntriesForDate, subscribeUserEntries } from '../services/firestoreService';
 import { getTodayString } from '../utils/dateUtils';
 import { computeSportXp } from '../constants/titles';
+import { ACHIEVEMENTS, AchievementDef, computeUnlockedAchievements } from '../constants/achievements';
+import AchievementToast from '../components/AchievementToast';
 
 interface AppContextType {
   currentUser: User | null;
@@ -12,6 +14,7 @@ interface AppContextType {
   myEntries: DayEntry[];
   todayMyEntry: DayEntry | null;
   mySportXp: Record<string, number>;
+  myAchievements: string[];
   setCurrentUser: (user: User) => Promise<void>;
   updateUserSettings: (updates: { height?: number; gender?: 'male' | 'female'; age?: number }) => Promise<void>;
   updateTitle: (titleKey: string | undefined) => Promise<void>;
@@ -27,6 +30,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [todayEntries, setTodayEntries] = useState<DayEntry[]>([]);
   const [myEntries, setMyEntries] = useState<DayEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toastQueue, setToastQueue] = useState<AchievementDef[]>([]);
 
   useEffect(() => {
     loadUser().then(user => {
@@ -54,7 +58,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const todayMyEntry = todayEntries.find(e => e.userId === currentUser?.id) ?? null;
 
-  // Compute sport XP from all of current user's entries
   const mySportXp = useMemo(() => computeSportXp(myEntries), [myEntries]);
 
   // Auto-sync sportXp to Firebase whenever it changes
@@ -70,8 +73,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     upsertUser(updated).catch(() => {});
   }, [mySportXp]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Compute achievements and detect newly unlocked ones
+  const myAchievements = useMemo(
+    () => computeUnlockedAchievements(myEntries, mySportXp),
+    [myEntries, mySportXp],
+  );
+
+  const prevAchievementsRef = useRef<string[] | null>(null);
+  useEffect(() => {
+    if (prevAchievementsRef.current === null) {
+      // First computation after login — set baseline without showing toasts
+      prevAchievementsRef.current = myAchievements;
+      return;
+    }
+    const prev = prevAchievementsRef.current;
+    const newOnes = myAchievements.filter(k => !prev.includes(k));
+    prevAchievementsRef.current = myAchievements;
+    if (!newOnes.length) return;
+    const defs = newOnes
+      .map(k => ACHIEVEMENTS.find(a => a.key === k))
+      .filter(Boolean) as AchievementDef[];
+    setToastQueue(q => [...q, ...defs]);
+  }, [myAchievements]);
+
+  // Reset achievement baseline when user changes
+  useEffect(() => {
+    prevAchievementsRef.current = null;
+  }, [currentUser?.id]);
+
   async function setCurrentUser(user: User) {
-    // Merge with existing data so settings survive re-login
     let merged = user;
     const existingInList = allUsers.find(u => u.id === user.id);
     if (existingInList) {
@@ -108,12 +138,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     clearUser();
   }
 
+  function dismissToast() {
+    setToastQueue(q => q.slice(1));
+  }
+
   return (
     <AppContext.Provider value={{
       currentUser, allUsers, todayEntries, myEntries, todayMyEntry,
-      mySportXp, setCurrentUser, updateUserSettings, updateTitle, logout, loading,
+      mySportXp, myAchievements, setCurrentUser, updateUserSettings, updateTitle, logout, loading,
     }}>
       {children}
+      {toastQueue[0] && (
+        <AchievementToast
+          key={toastQueue[0].key}
+          achievement={toastQueue[0]}
+          onDismiss={dismissToast}
+        />
+      )}
     </AppContext.Provider>
   );
 }

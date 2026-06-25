@@ -66,6 +66,7 @@ export interface ChatMessage {
   userAvatarColor: string;
   text: string;
   timestamp: number;
+  reactions?: Record<string, Record<string, boolean>>; // emoji -> { userId: true }
 }
 
 export type Screen = 'login' | 'home' | 'checkin' | 'calendar' | 'stats' | 'nutrition';

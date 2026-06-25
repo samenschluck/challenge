@@ -2,13 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
+  Modal, TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { ChatMessage } from '../types';
-import { sendChatMessage, subscribeChatMessages } from '../services/firestoreService';
+import { sendChatMessage, subscribeChatMessages, toggleChatReaction } from '../services/firestoreService';
 import { displayName } from '../utils/displayName';
+
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '💪', '🔥', '😮'];
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
@@ -24,6 +27,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [reactionTarget, setReactionTarget] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -54,13 +58,23 @@ export default function ChatScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }
 
+  async function handleReaction(emoji: string) {
+    if (!reactionTarget || !currentUser) return;
+    setReactionTarget(null);
+    await toggleChatReaction(reactionTarget, emoji, currentUser.id);
+  }
+
+  async function handleReactionChipPress(messageId: string, emoji: string) {
+    if (!currentUser) return;
+    await toggleChatReaction(messageId, emoji, currentUser.id);
+  }
+
   return (
     <LinearGradient colors={['#0f0f1a', '#0f0f1a']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <View style={styles.header}>
             <Text style={styles.headerTitle}>💬 Gruppen-Chat</Text>
@@ -81,14 +95,20 @@ export default function ChatScreen() {
               const isMe = msg.userId === currentUser?.id;
               const prevMsg = i > 0 ? messages[i - 1] : null;
               const showAvatar = !prevMsg || prevMsg.userId !== msg.userId;
+
+              // Build reaction chips
+              const reactionEntries = Object.entries(msg.reactions ?? {})
+                .map(([emoji, users]) => ({
+                  emoji,
+                  count: Object.keys(users).length,
+                  hasMe: !!(users[currentUser?.id ?? '']),
+                }))
+                .filter(r => r.count > 0);
+
               return (
                 <View
                   key={msg.id}
-                  style={[
-                    styles.msgRow,
-                    isMe ? styles.msgRowMe : styles.msgRowThem,
-                    !showAvatar && (isMe ? styles.msgRowNoAvatarMe : styles.msgRowNoAvatarThem),
-                  ]}
+                  style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowThem]}
                 >
                   {!isMe && (
                     <View style={styles.avatarSlot}>
@@ -102,16 +122,40 @@ export default function ChatScreen() {
                     </View>
                   )}
 
-                  <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-                    {showAvatar && !isMe && (
-                      <Text style={[styles.senderName, { color: msg.userAvatarColor }]}>{msg.userName}</Text>
+                  <View style={{ maxWidth: '72%' }}>
+                    <TouchableOpacity
+                      onLongPress={() => setReactionTarget(msg.id)}
+                      delayLongPress={300}
+                      activeOpacity={0.85}
+                    >
+                      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+                        {showAvatar && !isMe && (
+                          <Text style={[styles.senderName, { color: msg.userAvatarColor }]}>{msg.userName}</Text>
+                        )}
+                        <Text style={styles.msgText}>{msg.text}</Text>
+                        <Text style={styles.msgTime}>{formatTime(msg.timestamp)}</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {reactionEntries.length > 0 && (
+                      <View style={[styles.reactionsRow, isMe && styles.reactionsRowMe]}>
+                        {reactionEntries.map(r => (
+                          <TouchableOpacity
+                            key={r.emoji}
+                            style={[styles.reactionChip, r.hasMe && styles.reactionChipMine]}
+                            onPress={() => handleReactionChipPress(msg.id, r.emoji)}
+                          >
+                            <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                            {r.count > 1 && <Text style={styles.reactionCount}>{r.count}</Text>}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     )}
-                    <Text style={styles.msgText}>{msg.text}</Text>
-                    <Text style={styles.msgTime}>{formatTime(msg.timestamp)}</Text>
                   </View>
                 </View>
               );
             })}
+            <View style={{ height: 8 }} />
           </ScrollView>
 
           <View style={styles.inputRow}>
@@ -137,6 +181,26 @@ export default function ChatScreen() {
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* Reaction picker overlay */}
+      <Modal visible={!!reactionTarget} transparent animationType="fade" onRequestClose={() => setReactionTarget(null)}>
+        <TouchableWithoutFeedback onPress={() => setReactionTarget(null)}>
+          <View style={styles.reactionOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.reactionPicker}>
+                <Text style={styles.reactionPickerHint}>Reaktion wählen</Text>
+                <View style={styles.reactionPickerRow}>
+                  {REACTION_EMOJIS.map(emoji => (
+                    <TouchableOpacity key={emoji} style={styles.reactionPickerBtn} onPress={() => handleReaction(emoji)}>
+                      <Text style={styles.reactionPickerEmoji}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -149,24 +213,33 @@ const styles = StyleSheet.create({
   messageList: { padding: 16, paddingBottom: 8, gap: 2 },
   emptyHint: { textAlign: 'center', color: COLORS.textMuted, fontSize: 14, marginTop: 40, lineHeight: 22 },
 
-  msgRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 6 },
   msgRowMe: { justifyContent: 'flex-end' },
   msgRowThem: { justifyContent: 'flex-start' },
-  msgRowNoAvatarMe: { marginBottom: 1 },
-  msgRowNoAvatarThem: { marginBottom: 1 },
 
-  avatarSlot: { width: 36, marginRight: 8 },
+  avatarSlot: { width: 36, marginRight: 8, alignSelf: 'flex-start', marginTop: 2 },
   avatarCircle: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   avatarEmoji: { fontSize: 16 },
   avatarPlaceholder: { width: 32 },
 
-  bubble: { maxWidth: '72%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, paddingBottom: 7 },
+  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, paddingBottom: 7 },
   bubbleMe: { backgroundColor: COLORS.primary + 'cc', borderBottomRightRadius: 4 },
   bubbleThem: { backgroundColor: COLORS.card, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: COLORS.border },
 
   senderName: { fontSize: 11, fontWeight: '800', marginBottom: 3 },
   msgText: { fontSize: 15, color: COLORS.text, lineHeight: 21 },
   msgTime: { fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4, textAlign: 'right' },
+
+  reactionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  reactionsRowMe: { justifyContent: 'flex-end' },
+  reactionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: COLORS.card, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  reactionChipMine: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '22' },
+  reactionEmoji: { fontSize: 14 },
+  reactionCount: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
 
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
@@ -185,4 +258,18 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.35 },
   sendBtnIcon: { fontSize: 20, color: '#fff', fontWeight: '800', marginTop: -2 },
+
+  // Reaction picker modal
+  reactionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  reactionPicker: {
+    backgroundColor: '#1e1e35', borderRadius: 20, padding: 20,
+    borderWidth: 1, borderColor: COLORS.border, alignItems: 'center',
+  },
+  reactionPickerHint: { fontSize: 12, color: COLORS.textMuted, marginBottom: 14, fontWeight: '600' },
+  reactionPickerRow: { flexDirection: 'row', gap: 8 },
+  reactionPickerBtn: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: COLORS.cardLight, alignItems: 'center', justifyContent: 'center',
+  },
+  reactionPickerEmoji: { fontSize: 24 },
 });

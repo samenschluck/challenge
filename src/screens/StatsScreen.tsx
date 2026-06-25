@@ -10,6 +10,8 @@ import {
   SPORT_TITLES, getTitleByKey, getLevelFromXp, getXpProgress,
   totalXp, computeSportXp, MAX_LEVEL,
 } from '../constants/titles';
+import { ACHIEVEMENTS, RARITY_COLORS, RARITY_LABELS } from '../constants/achievements';
+import AchievementBadge from '../components/AchievementBadge';
 
 const SPORT_EMOJIS: Record<string, string> = {
   'Krafttraining': '🏋️', 'Cardio': '❤️', 'HIIT': '⚡',
@@ -76,8 +78,10 @@ const xpBarStyles = StyleSheet.create({
   fill: { height: 6, borderRadius: 3 },
 });
 
+const RARITY_ORDER: Record<string, number> = { legendary: 0, epic: 1, rare: 2, common: 3 };
+
 export default function StatsScreen() {
-  const { currentUser, allUsers, myEntries, mySportXp } = useApp();
+  const { currentUser, allUsers, myEntries, mySportXp, myAchievements } = useApp();
 
   const today = getTodayString();
   const daysElapsed = Math.max(1, Math.floor(
@@ -276,6 +280,45 @@ export default function StatsScreen() {
             </View>
           )}
 
+          {/* Achievements */}
+          <View style={styles.card}>
+            <View style={styles.achievementHeader}>
+              <Text style={styles.cardTitle}>🏅 Achievements</Text>
+              <Text style={styles.achievementCount}>
+                {myAchievements.length}/{ACHIEVEMENTS.length} freigeschaltet
+              </Text>
+            </View>
+
+            {/* Unlocked first, sorted by rarity desc, then locked */}
+            {(['legendary', 'epic', 'rare', 'common'] as const).map(rarity => {
+              const inRarity = ACHIEVEMENTS.filter(a => a.rarity === rarity);
+              const unlockedInRarity = inRarity.filter(a => myAchievements.includes(a.key));
+              if (!unlockedInRarity.length) return null;
+              return (
+                <View key={rarity} style={styles.raritySection}>
+                  <View style={styles.rarityHeader}>
+                    <View style={[styles.rarityDot, { backgroundColor: RARITY_COLORS[rarity] }]} />
+                    <Text style={[styles.rarityLabel, { color: RARITY_COLORS[rarity] }]}>
+                      {RARITY_LABELS[rarity].toUpperCase()}
+                    </Text>
+                    <Text style={styles.raritySub}>{unlockedInRarity.length}/{inRarity.length}</Text>
+                  </View>
+                  <View style={styles.badgeGrid}>
+                    {inRarity.map(a => (
+                      <AchievementBadge key={a.key} achievement={a} unlocked={myAchievements.includes(a.key)} />
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+
+            {myAchievements.length === 0 && (
+              <Text style={styles.noAchievementsHint}>
+                Noch keine Achievements — fang mit dem ersten Training an! 💪
+              </Text>
+            )}
+          </View>
+
           <Text style={styles.footer}>Challenge: 23. Juni – 30. September 2026</Text>
         </ScrollView>
       </SafeAreaView>
@@ -336,4 +379,15 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
 
   footer: { textAlign: 'center', fontSize: 12, color: COLORS.textMuted, marginTop: 8 },
+
+  // Achievements
+  achievementHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  achievementCount: { fontSize: 12, color: COLORS.textMuted, fontWeight: '600' },
+  raritySection: { marginBottom: 16 },
+  rarityHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
+  rarityDot: { width: 8, height: 8, borderRadius: 4 },
+  rarityLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  raritySub: { fontSize: 11, color: COLORS.textMuted, marginLeft: 4 },
+  badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  noAchievementsHint: { fontSize: 14, color: COLORS.textMuted, textAlign: 'center', paddingVertical: 12 },
 });

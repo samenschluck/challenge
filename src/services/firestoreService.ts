@@ -77,3 +77,9 @@ export function subscribeChatMessages(cb: (messages: ChatMessage[]) => void, lim
     cb(msgs);
   });
 }
+
+export async function toggleChatReaction(messageId: string, emoji: string, userId: string): Promise<void> {
+  const r = ref(rtdb, `chat/${messageId}/reactions/${emoji}/${userId}`);
+  const snap = await get(r);
+  await set(r, snap.exists() ? null : true);
+}
