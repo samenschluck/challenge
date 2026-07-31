@@ -10,15 +10,18 @@ export interface TitleDef {
   emoji: string;
 }
 
-// XP needed to gain a single level (marginal cost)
-export function xpForLevel(level: number): number {
-  return 100 + (level - 1) * 50;
+// Flat XP cost per level — every level costs the same, so the required XP
+// never grows as you climb. Keeps leveling approachable at high levels.
+export const XP_PER_LEVEL = 100;
+
+// XP needed to gain a single level (marginal cost) — constant for all levels
+export function xpForLevel(_level: number): number {
+  return XP_PER_LEVEL;
 }
 
-// Total cumulative XP needed to reach a given level
-// = 100*n + 25*n*(n-1)
+// Total cumulative XP needed to reach a given level (linear)
 export function totalXpForLevel(level: number): number {
-  return 100 * level + 25 * level * (level - 1);
+  return XP_PER_LEVEL * level;
 }
 
 export function getLevelFromXp(xp: number): number {
@@ -54,10 +57,11 @@ export const SPORT_XP_MULTIPLIERS: Record<string, number> = {
   'Sonstiges': 1.0,
 };
 
+// Intensity has only a mild influence on XP — the sport and duration matter more.
 export const INTENSITY_XP_MULTIPLIERS: Record<string, number> = {
-  leicht: 0.75,
+  leicht: 0.9,
   mittel: 1.0,
-  intensiv: 1.3,
+  intensiv: 1.1,
 };
 
 export function calcWorkoutXp(duration: number, sport: string, intensity?: string): number {

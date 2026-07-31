@@ -6,6 +6,16 @@ export interface PatchNote {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: '1.6.0',
+    date: '31.07.2026',
+    changes: [
+      'Leveling deutlich einfacher ⚡ — jedes Level kostet jetzt gleich viel XP (100 pro Level) statt immer mehr',
+      'Level 30 (BLACK ⬛) braucht jetzt 3.000 XP statt 24.750 XP',
+      'Intensität (leicht/mittel/intensiv) hat weniger Einfluss auf die XP: 0.9× / 1.0× / 1.1×',
+      'Alle bisherigen XP der Teilnehmer wurden automatisch an die neuen Regeln angepasst',
+    ],
+  },
+  {
     version: '1.5.0',
     date: '25.06.2026',
     changes: [

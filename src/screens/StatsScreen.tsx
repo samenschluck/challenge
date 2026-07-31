@@ -82,16 +82,17 @@ export default function StatsScreen() {
     return list;
   }, [allUsers, currentUser]);
 
-  // For each user, get their sportXp (current user uses live mySportXp, others use stored)
+  // For each user, compute sportXp live from their entries so the current XP
+  // rules (multipliers, level curve) always apply to everyone — no stale values.
   function getUserSportXp(u: User): Record<string, number> {
     if (u.id === currentUser?.id) return mySportXp;
-    return u.sportXp ?? {};
+    return computeSportXp(allEntries.filter(e => e.userId === u.id));
   }
 
   // Rank users by total XP
   const rankedUsers = useMemo(() => {
     return [...displayUsers].sort((a, b) => totalXp(getUserSportXp(b)) - totalXp(getUserSportXp(a)));
-  }, [displayUsers, mySportXp]);
+  }, [displayUsers, mySportXp, allEntries]);
 
   // Collect all sports anyone has trained in
   const activeSports = useMemo(() => {
@@ -101,7 +102,7 @@ export default function StatsScreen() {
       Object.keys(xp).forEach(s => { if (xp[s] > 0) sports.add(s); });
     }
     return Array.from(sports).sort();
-  }, [displayUsers, mySportXp]);
+  }, [displayUsers, mySportXp, allEntries]);
 
   const RANK_ICONS = ['🥇', '🥈', '🥉'];
 
